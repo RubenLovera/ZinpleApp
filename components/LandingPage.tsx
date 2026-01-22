@@ -6,7 +6,7 @@ import { Phone, MessageCircle, ChevronDown, Calculator, Send, Coins, Store, Glob
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
-import MaintenanceBanner from "@/components/MaintenanceBanner"
+import MaintenanceBanner from "@/components/MaintenanceBanner" // Declare the MaintenanceBanner component
 
 export default function LandingPage() {
   const { setQuote, setCurrentStep } = useFlow()
@@ -17,7 +17,7 @@ export default function LandingPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [showMaintenanceBanner, setShowMaintenanceBanner] = useState(false)
+  const [showMaintenanceBanner, setShowMaintenanceBanner] = useState(false) // Declare the showMaintenanceBanner variable
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Detectar mobile
@@ -83,8 +83,13 @@ export default function LandingPage() {
   const handleStartOperation = () => {
     if (result === 0) return
 
-    // Mostrar banner de mantenimiento en lugar de continuar
-    setShowMaintenanceBanner(true)
+    // Guardar cotización y continuar al flujo
+    setQuote({
+      amount: Number.parseFloat(amount),
+      currency: currency as "usdt" | "bolivares",
+      result,
+    })
+    setCurrentStep("terms")
   }
 
   // Soporte para ENTER
@@ -615,9 +620,6 @@ export default function LandingPage() {
           <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
         </div>
       </div>
-
-      {/* Banner de mantenimiento */}
-      {showMaintenanceBanner && <MaintenanceBanner onClose={() => setShowMaintenanceBanner(false)} />}
     </div>
   )
 }
