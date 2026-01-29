@@ -12,6 +12,9 @@ import SummaryStep from "@/components/steps/SummaryStep"
 import PaymentStep from "@/components/steps/PaymentStep"
 import RegisterStep from "@/components/steps/RegisterStep"
 import LoginStep from "@/components/steps/LoginStep"
+import BeneficiaryDataStep from "@/components/steps/BeneficiaryDataStep"
+import SenderDataStep from "@/components/steps/SenderDataStep"
+import DestinationDataStep from "@/components/steps/DestinationDataStep"
 import { useFlow } from "@/contexts/FlowContext"
 
 function FlowContent() {
@@ -38,6 +41,12 @@ function FlowContent() {
       return <WalletDataStep />
     case "pagomovil-data":
       return <PagomovileDataStep />
+    case "beneficiary-data":
+      return <BeneficiaryDataStep />
+    case "sender-data":
+      return <SenderDataStep />
+    case "destination-data":
+      return <DestinationDataStep />
     case "summary":
       return <SummaryStep />
     case "payment":

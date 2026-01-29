@@ -1,16 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle, MessageCircle, Copy, Clock, DollarSign, AlertTriangle, RefreshCw, Building } from "lucide-react"
+import { CheckCircle, MessageCircle, Copy, Clock, AlertTriangle, RefreshCw, Send, Download, Wallet, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
+import { getCurrencyInfo } from "@/types/database"
+import PaymentInstructions from "@/components/PaymentInstructions"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function PaymentStep() {
-  const { quote, user, thirdParty, operation, isThirdPartyPayment, resetFlow } = useFlow()
+  const { quote, user, beneficiary, sender, thirdParty, operation, isThirdPartyPayment, resetFlow, operationMode } = useFlow()
   const [timeLeft, setTimeLeft] = useState(30 * 60) // 30 minutos en segundos
   const [copied, setCopied] = useState<string | null>(null)
+
+  // Obtener información de las monedas
+  const sourceCurrency = quote ? getCurrencyInfo(quote.sourceCurrency) : null
+  const destCurrency = quote ? getCurrencyInfo(quote.destinationCurrency) : null
 
   // Countdown timer
   useEffect(() => {
@@ -48,66 +54,98 @@ export default function PaymentStep() {
 
     const payerName = isThirdPartyPayment ? thirdParty?.name : user.fullName
     const payerPhone = isThirdPartyPayment ? thirdParty?.phone : user.phone
-    const currency = quote.currency === "usdt" ? "USDT" : "Bolívares"
 
-    // Construir datos de destino según la moneda
-    let destinationData = ""
-    if (quote.currency === "usdt") {
-      destinationData = `Wallet USDT POLYGON: ${user.walletAddress}`
-    } else {
-      destinationData = `Datos Pagomóvil:
-• Número: ${user.pagomovil?.phone}
-• Banco: ${user.pagomovil?.bank?.toUpperCase()}
-• Titular: ${user.pagomovil?.accountHolder}
-• Cédula: ${user.pagomovil?.cedula}`
+    // Construir mensaje según el modo de operación
+    let message = ""
+    
+    if (operationMode === "send") {
+      message = `Hola! Ya he enviado los fondos para mi operación de envío internacional.
+
+*DATOS DE LA OPERACION*
+ID: *${operation.id}*
+Monto enviado: *${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}*
+Beneficiario recibe: *${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}*
+
+*DATOS DEL REMITENTE*
+Nombre: ${user.fullName}
+Email: ${user.email}
+Teléfono: ${user.phone}
+
+*DATOS DEL BENEFICIARIO*
+Nombre: ${beneficiary?.fullName}
+Teléfono: ${beneficiary?.phone}
+${beneficiary?.pagomovil ? `Pago Móvil: 0${beneficiary.pagomovil.phone} - ${beneficiary.pagomovil.bank}` : ""}
+
+Adjunto el comprobante de pago.`
+    } else if (operationMode === "receive") {
+      message = `Hola! He creado una solicitud de recepción de dinero.
+
+*DATOS DE LA OPERACION*
+ID: *${operation.id}*
+Remitente envía: *${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}*
+Yo recibo: *${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}*
+
+*MIS DATOS (BENEFICIARIO)*
+Nombre: ${user.fullName}
+Email: ${user.email}
+Teléfono: ${user.phone}
+${user.pagomovil ? `Pago Móvil: 0${user.pagomovil.phone} - ${user.pagomovil.bank}` : ""}
+
+*DATOS DEL REMITENTE*
+Nombre: ${sender?.fullName}
+País: ${sender?.country}
+Teléfono: ${sender?.phone}
+
+Por favor generen el link de pago para compartir con el remitente.`
+    } else if (operationMode === "buy_usdt") {
+      message = `Hola! Ya he enviado los fondos para comprar USDT.
+
+*DATOS DE LA OPERACION*
+ID: *${operation.id}*
+Monto enviado: *${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}*
+USDT a recibir: *${quote.result.toLocaleString()} USDT*
+
+*MIS DATOS*
+Nombre: ${user.fullName}
+Email: ${user.email}
+Teléfono: ${user.phone}
+Wallet USDT (Polygon): ${user.walletAddress}
+
+Adjunto el comprobante de pago.`
+    } else if (operationMode === "sell_usdt") {
+      message = `Hola! Quiero vender USDT.
+
+*DATOS DE LA OPERACION*
+ID: *${operation.id}*
+USDT a vender: *${quote.amount.toLocaleString()} USDT*
+Bolívares a recibir: *Bs ${quote.result.toLocaleString()} VES*
+
+*MIS DATOS*
+Nombre: ${user.fullName}
+Email: ${user.email}
+Teléfono: ${user.phone}
+Pago Móvil: 0${user.pagomovil?.phone} - ${user.pagomovil?.bank}
+Cédula: ${user.pagomovil?.cedula}
+
+Por favor indíquenme la wallet donde debo enviar los USDT.`
     }
-
-    // Construir datos del pagador
-    const payerData = isThirdPartyPayment
-      ? `Datos del Pagador (Tercero):
-• Nombre: ${thirdParty?.name}
-• Teléfono: ${thirdParty?.phone}
-• Email: ${thirdParty?.email}`
-      : `Datos del Pagador:
-• Nombre: ${user.fullName}
-• Teléfono: ${user.phone}
-• Email: ${user.email}`
-
-    const message = `✅ *TRANSACCIÓN EN PROCESO*
-
-Ya he enviado los fondos en ZELLE a la cuenta asignada por ZinpleApp, estos son los datos de mi operación:
-
-📋 *DATOS DE LA OPERACIÓN*
-• ID de transacción: *${operation.id}*
-• Monto enviado en USD: *$${quote.amount.toFixed(2)}*
-• Monto a recibir en ${currency}: *${quote.result.toFixed(2)}*
-
-👤 *TITULAR DE LA CUENTA*
-• Nombre: ${user.fullName}
-• Email: ${user.email}
-
-💰 *${payerData}*
-
-🎯 *DATOS DE DESTINO PARA ${currency.toUpperCase()}*
-${destinationData}
-
-📎 Adjunto el comprobante de pago a este mensaje.
-
-Por favor confirmen la recepción del pago para procesar mi ${currency}.`
 
     const whatsappUrl = `https://wa.me/12138245415?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
   }
 
-  const handleNewOperation = () => {
-    resetFlow()
+  const handleShareLink = () => {
+    if (!operation) return
+    
+    // Generar link de pago para compartir (modo receive)
+    const paymentLink = `${window.location.origin}/pay/${operation.id}`
+    navigator.clipboard.writeText(paymentLink)
+    setCopied("link")
+    setTimeout(() => setCopied(null), 2000)
   }
 
-  // Datos de Zelle de ZinpleApp
-  const zelleData = {
-    email: "sonderenter@gmail.com",
-    titular: "SONDERENTER INC",
-    tipo: "CORPORATIVA",
+  const handleNewOperation = () => {
+    resetFlow()
   }
 
   if (!quote || !user || !operation) {
@@ -115,7 +153,7 @@ Por favor confirmen la recepción del pago para procesar mi ${currency}.`
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="container mx-auto max-w-2xl">
           <div className="text-center">
-            <h1 className="text-3xl font-bold mb-4" style={{ color: "#5B38B5" }}>
+            <h1 className="text-3xl font-bold mb-4 text-primary">
               Error
             </h1>
             <p className="text-gray-600 mb-6">No se encontraron los datos de la operación.</p>
@@ -126,6 +164,49 @@ Por favor confirmen la recepción del pago para procesar mi ${currency}.`
     )
   }
 
+  // Título e icono según el modo
+  const getModeInfo = () => {
+    switch (operationMode) {
+      case "send":
+        return { 
+          title: "Operación de Envío Creada", 
+          icon: <Send className="w-8 h-8" />, 
+          bgClass: "bg-blue-100",
+          textClass: "text-blue-600"
+        }
+      case "receive":
+        return { 
+          title: "Solicitud de Pago Creada", 
+          icon: <Download className="w-8 h-8" />, 
+          bgClass: "bg-green-100",
+          textClass: "text-green-600"
+        }
+      case "buy_usdt":
+        return { 
+          title: "Orden de Compra Creada", 
+          icon: <Wallet className="w-8 h-8" />, 
+          bgClass: "bg-purple-100",
+          textClass: "text-purple-600"
+        }
+      case "sell_usdt":
+        return { 
+          title: "Orden de Venta Creada", 
+          icon: <Wallet className="w-8 h-8" />, 
+          bgClass: "bg-orange-100",
+          textClass: "text-orange-600"
+        }
+      default:
+        return { 
+          title: "Operación Creada", 
+          icon: <CheckCircle className="w-8 h-8" />, 
+          bgClass: "bg-green-100",
+          textClass: "text-green-600"
+        }
+    }
+  }
+
+  const modeInfo = getModeInfo()
+
   return (
     <div className="min-h-screen bg-gray-50">
       <ProgressBar />
@@ -133,261 +214,249 @@ Por favor confirmen la recepción del pago para procesar mi ${currency}.`
         <div className="container mx-auto max-w-3xl">
           {/* Header de éxito */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+            <div className={`w-16 h-16 ${modeInfo.bgClass} rounded-full flex items-center justify-center mx-auto mb-4`}>
+              <div className={modeInfo.textClass}>{modeInfo.icon}</div>
             </div>
-            <h1 className="text-3xl font-bold mb-2" style={{ color: "#5B38B5" }}>
-              ¡Operación Creada!
+            <h1 className="text-3xl font-bold mb-2 text-primary">
+              {modeInfo.title}
             </h1>
-            <p className="text-gray-600">Ahora realiza el pago para completar tu operación</p>
+            <p className="text-gray-600">
+              {operationMode === "receive" 
+                ? "Comparte el link de pago con tu remitente" 
+                : "Ahora realiza el pago para completar tu operación"}
+            </p>
           </div>
 
-          {/* Timer */}
-          <Card className="mb-6 border-orange-200 bg-orange-50">
+          {/* Timer (solo para modos que requieren pago) */}
+          {operationMode !== "receive" && (
+            <Card className="mb-6 border-orange-200 bg-orange-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-center gap-3">
+                  <Clock className="w-5 h-5 text-orange-600" />
+                  <div className="text-center">
+                    <p className="text-orange-800 font-medium">Tiempo para completar el pago</p>
+                    <p className="text-2xl font-bold text-orange-900">{formatTime(timeLeft)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ID de operación */}
+          <Card className="mb-6">
             <CardContent className="p-4">
-              <div className="flex items-center justify-center gap-3">
-                <Clock className="w-5 h-5 text-orange-600" />
-                <div className="text-center">
-                  <p className="text-orange-800 font-medium">Tiempo para completar el pago</p>
-                  <p className="text-2xl font-bold text-orange-900">{formatTime(timeLeft)}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">ID de Operación</p>
+                  <p className="font-mono font-bold text-lg">{operation.id}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCopy(operation.id, "id")}
+                >
+                  {copied === "id" ? (
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Resumen de la operación */}
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{sourceCurrency?.flag}</span>
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      {operationMode === "receive" ? "Remitente envía" : "Envías"}
+                    </p>
+                    <p className="font-bold text-lg">
+                      {sourceCurrency?.symbol}{quote.amount.toLocaleString()} {quote.sourceCurrency}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-2xl text-gray-400">→</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">
+                      {operationMode === "receive" ? "Recibes" : "Beneficiario recibe"}
+                    </p>
+                    <p className="font-bold text-lg text-primary">
+                      {destCurrency?.symbol}{quote.result.toLocaleString()} {quote.destinationCurrency}
+                    </p>
+                  </div>
+                  <span className="text-2xl">{destCurrency?.flag}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Datos de Zelle de ZinpleApp */}
-            <Card className="border-green-200 bg-green-50">
+          {/* Instrucciones de pago (solo para modos que requieren pago) */}
+          {operationMode !== "receive" && (
+            <div className="mb-6">
+              <PaymentInstructions 
+                currency={quote.sourceCurrency} 
+                amount={quote.amount}
+              />
+            </div>
+          )}
+
+          {/* Link de pago para compartir (modo receive) */}
+          {operationMode === "receive" && (
+            <Card className="mb-6 border-green-200 bg-green-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-green-800">
-                  <Building className="w-5 h-5" />
-                  Datos de Zelle - ZinpleApp
+                  <Share2 className="w-5 h-5" />
+                  Link de Pago para Compartir
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-green-700 font-medium">Zelle ID:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-green-900">{zelleData.email}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(zelleData.email, "zelle-email")}
-                      className="h-6 w-6 p-0"
-                    >
-                      {copied === "zelle-email" ? (
-                        <CheckCircle className="w-3 h-3 text-green-600" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                    </Button>
+                <p className="text-green-700">
+                  Comparte este link con <strong>{sender?.fullName}</strong> para que pueda realizar el pago desde {sender?.country}.
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1 bg-white p-3 rounded-lg border border-green-300 font-mono text-sm truncate">
+                    {window.location.origin}/pay/{operation.id}
                   </div>
+                  <Button onClick={handleShareLink} className="bg-green-600 hover:bg-green-700">
+                    {copied === "link" ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-green-700 font-medium">Titular:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-green-900">{zelleData.titular}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(zelleData.titular, "titular")}
-                      className="h-6 w-6 p-0"
-                    >
-                      {copied === "titular" ? (
-                        <CheckCircle className="w-3 h-3 text-green-600" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-green-700 font-medium">Tipo:</span>
-                  <span className="font-bold text-green-900">{zelleData.tipo}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-green-700 font-medium">Monto a enviar:</span>
-                  <span className="text-2xl font-bold text-green-900">${quote.amount.toFixed(2)} USD</span>
-                </div>
+                <p className="text-sm text-green-600">
+                  Una vez que el remitente complete el pago, recibirás tus bolívares automáticamente por Pago Móvil.
+                </p>
               </CardContent>
             </Card>
-
-            {/* Detalles de la operación */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  Detalles de tu Operación
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">ID de Operación:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold">{operation.id}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(operation.id, "id")}
-                      className="h-6 w-6 p-0"
-                    >
-                      {copied === "id" ? (
-                        <CheckCircle className="w-3 h-3 text-green-600" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Recibirás:</span>
-                  <span className="text-xl font-bold">
-                    {quote.result.toFixed(2)} {quote.currency === "usdt" ? "USDT" : "VES"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Pagador:</span>
-                  <span className="font-medium">{isThirdPartyPayment ? thirdParty?.name : user.fullName}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Estado:</span>
-                  <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
-                    Pendiente de Pago
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Datos de destino */}
-          <Card className="mt-6 border-blue-200 bg-blue-50">
-            <CardHeader>
-              <CardTitle className="text-blue-800">
-                📍 Datos de Destino - {quote.currency === "usdt" ? "Wallet USDT" : "Pagomóvil"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {quote.currency === "usdt" ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-700 font-medium">Red:</span>
-                    <span className="font-bold text-blue-900">Polygon</span>
-                  </div>
-                  <div className="flex justify-between items-start">
-                    <span className="text-blue-700 font-medium">Dirección:</span>
-                    <div className="flex items-center gap-2 max-w-xs">
-                      <span className="font-mono text-sm text-blue-900 break-all">{user.walletAddress}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(user.walletAddress || "", "wallet")}
-                        className="h-6 w-6 p-0 flex-shrink-0"
-                      >
-                        {copied === "wallet" ? (
-                          <CheckCircle className="w-3 h-3 text-green-600" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-blue-700 font-medium text-sm">Número:</span>
-                    <p className="font-bold text-blue-900">{user.pagomovil?.phone}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium text-sm">Banco:</span>
-                    <p className="font-bold text-blue-900 capitalize">{user.pagomovil?.bank}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium text-sm">Titular:</span>
-                    <p className="font-bold text-blue-900">{user.pagomovil?.accountHolder}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium text-sm">Cédula:</span>
-                    <p className="font-bold text-blue-900">{user.pagomovil?.cedula}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          )}
 
           {/* Instrucciones paso a paso */}
-          <Card className="mt-6">
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Instrucciones para Completar tu Operación</CardTitle>
+              <CardTitle>Siguientes Pasos</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-purple-600 text-sm font-bold">1</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Realiza el pago por Zelle</p>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {isThirdPartyPayment ? `${thirdParty?.name} debe enviar` : "Envía"} ${quote.amount.toFixed(2)} USD
-                      a la cuenta Zelle de ZinpleApp mostrada arriba
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-purple-600 text-sm font-bold">2</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Guarda el comprobante</p>
-                    <p className="text-gray-600 text-sm mt-1">
-                      Toma captura de pantalla del comprobante de pago de Zelle
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-purple-600 text-sm font-bold">3</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Envía el comprobante por WhatsApp</p>
-                    <p className="text-gray-600 text-sm mt-1">
-                      Haz clic en el botón de WhatsApp y envía el comprobante. El mensaje incluirá automáticamente todos
-                      los datos necesarios para procesar tu {quote.currency === "usdt" ? "USDT" : "Bolívares"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-purple-600 text-sm font-bold">4</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Recibe tus fondos al instante</p>
-                    <p className="text-gray-600 text-sm mt-1">
-                      Una vez confirmado el comprobante, recibirás tus{" "}
-                      {quote.currency === "usdt" ? "USDT" : "Bolívares"} inmediatamente
-                    </p>
-                  </div>
-                </div>
+                {operationMode === "receive" ? (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">1</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Copia el link de pago</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Usa el botón de arriba para copiar el link
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">2</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Comparte con {sender?.fullName}</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Envía el link por WhatsApp, email o cualquier medio
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">3</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Espera el pago</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Tu remitente verá los datos de pago en el link
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">4</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Recibe automáticamente</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Una vez confirmado el pago, recibirás tus bolívares por Pago Móvil
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">1</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Realiza el pago</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Envía exactamente {sourceCurrency?.symbol}{quote.amount.toLocaleString()} {quote.sourceCurrency} a los datos indicados arriba
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">2</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Guarda el comprobante</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Toma captura de pantalla del comprobante de pago
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">3</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Envía por WhatsApp</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Usa el botón de abajo para enviar el comprobante con todos los datos
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-primary text-sm font-bold">4</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Recibe tus fondos</p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Una vez confirmado, procesamos tu {quote.destinationCurrency} inmediatamente
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Advertencias importantes */}
-          <Card className="mt-6 border-red-200 bg-red-50">
+          <Card className="mb-6 border-red-200 bg-red-50">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-red-800 font-medium">Importante</p>
                   <ul className="text-red-700 text-sm mt-2 space-y-1">
-                    <li>• El pago debe realizarse exactamente por ${quote.amount.toFixed(2)} USD</li>
-                    <li>• Usa los datos de Zelle mostrados arriba (sonderenter@gmail.com)</li>
-                    <li>• Tienes 30 minutos para completar el pago</li>
-                    <li>
-                      • Guarda el ID de operación: <strong>{operation.id}</strong>
-                    </li>
-                    <li>• El mensaje de WhatsApp incluirá automáticamente todos los datos necesarios</li>
+                    <li>El pago debe realizarse exactamente por {sourceCurrency?.symbol}{quote.amount.toLocaleString()} {quote.sourceCurrency}</li>
+                    <li>Guarda el ID de operación: <strong>{operation.id}</strong></li>
+                    {operationMode !== "receive" && (
+                      <li>Tienes 30 minutos para completar el pago</li>
+                    )}
                   </ul>
                 </div>
               </div>
@@ -395,17 +464,17 @@ Por favor confirmen la recepción del pago para procesar mi ${currency}.`
           </Card>
 
           {/* Botones de acción */}
-          <div className="mt-8 space-y-4">
+          <div className="space-y-4">
             <Button
               onClick={handleWhatsAppContact}
               className="w-full text-white text-lg py-6"
               style={{ backgroundColor: "#25D366" }}
             >
               <MessageCircle className="w-5 h-5 mr-2" />
-              Enviar Comprobante por WhatsApp
+              {operationMode === "receive" ? "Contactar Soporte" : "Enviar Comprobante por WhatsApp"}
             </Button>
 
-            <Button variant="outline" onClick={handleNewOperation} className="w-full text-lg py-6">
+            <Button variant="outline" onClick={handleNewOperation} className="w-full text-lg py-6 bg-transparent">
               <RefreshCw className="w-5 h-5 mr-2" />
               Crear Nueva Operación
             </Button>
