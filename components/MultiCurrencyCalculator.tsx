@@ -103,7 +103,7 @@ const modeConfig: Record<OperationMode, {
 }
 
 export default function MultiCurrencyCalculator() {
-  const { setQuote, setCurrentStep } = useFlow()
+  const { setQuote, setCurrentStep, setOperationMode } = useFlow()
   const [mode, setMode] = useState<OperationMode>("send")
   const [amount, setAmount] = useState("")
   const [sourceCurrency, setSourceCurrency] = useState("USD")
@@ -183,11 +183,20 @@ export default function MultiCurrencyCalculator() {
   const handleStartOperation = () => {
     if (result === 0) return
     
+    // Guardar el modo de operación
+    setOperationMode(mode)
+    
+    // Guardar la cotización con todos los datos necesarios
     setQuote({
       amount: Number.parseFloat(amount),
       currency: destCurrency === "USDT" ? "usdt" : "bolivares",
       result,
+      sourceCurrency,
+      destinationCurrency: destCurrency,
+      rate: currentRate,
+      fee: currentFee,
     })
+    
     setCurrentStep("terms")
   }
 
