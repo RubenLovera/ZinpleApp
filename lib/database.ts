@@ -1,9 +1,69 @@
 import { supabase } from "./supabase"
-import type { User, Operation, UserFormData, OperationData } from "@/types/database"
+import type { OperationMode } from "@/types/database"
 
-export async function checkUserExists(email: string): Promise<User | null> {
+// Tipos alineados con el nuevo esquema de BD
+export interface DBUser {
+  id: string
+  email: string
+  phone?: string
+  full_name?: string
+  document_type?: string
+  document_number?: string
+  country?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DBOperation {
+  id: string
+  operation_number: string
+  mode: OperationMode
+  status: "pending" | "awaiting_payment" | "processing" | "completed" | "cancelled" | "expired"
+  currency_pair: string
+  source_currency: string
+  destination_currency: string
+  source_amount: number
+  destination_amount: number
+  exchange_rate: number
+  fee_percentage: number
+  fee_amount: number
+  user_id?: string
+  user_email: string
+  user_phone?: string
+  user_full_name?: string
+  user_document_type?: string
+  user_document_number?: string
+  user_country?: string
+  beneficiary_full_name?: string
+  beneficiary_phone?: string
+  beneficiary_email?: string
+  beneficiary_bank_code?: string
+  beneficiary_bank_name?: string
+  beneficiary_wallet_address?: string
+  sender_full_name?: string
+  sender_email?: string
+  sender_phone?: string
+  sender_country?: string
+  destination_bank_code?: string
+  destination_bank_name?: string
+  destination_phone?: string
+  destination_document?: string
+  destination_wallet_address?: string
+  payment_link?: string
+  payment_method?: string
+  payment_reference?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export async function checkUserExists(email: string): Promise<DBUser | null> {
   try {
-    const { data: user, error } = await supabase.from("users").select("*").eq("email", email).single()
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single()
 
     if (error && error.code !== "PGRST116") {
       console.error("Error checking user:", error)
@@ -17,7 +77,14 @@ export async function checkUserExists(email: string): Promise<User | null> {
   }
 }
 
-export async function createUser(userData: UserFormData): Promise<User | null> {
+export async function createUser(userData: {
+  email: string
+  fullName?: string
+  phone?: string
+  documentType?: string
+  documentNumber?: string
+  country?: string
+}): Promise<DBUser | null> {
   try {
     console.log("Creating new user:", userData.email)
 
@@ -25,16 +92,11 @@ export async function createUser(userData: UserFormData): Promise<User | null> {
       .from("users")
       .insert({
         email: userData.email,
-        full_name: userData.fullName,
-        phone: userData.phone,
-        user_type: userData.userType,
-        monthly_volume_expected: userData.monthlyVolumeExpected,
-        receives_third_party_payments: userData.receivesThirdPartyPayments,
-        expected_third_parties: userData.expectedThirdParties,
-        wallet_address: userData.walletAddress,
-        // Remove fields that don't exist in the actual schema
-        current_limit: 10, // Límite inicial de $10
-        completed_operations: 0,
+        full_name: userData.fullName || null,
+        phone: userData.phone || null,
+        document_type: userData.documentType || null,
+        document_number: userData.documentNumber || null,
+        country: userData.country || null,
       })
       .select()
       .single()
@@ -51,22 +113,23 @@ export async function createUser(userData: UserFormData): Promise<User | null> {
   }
 }
 
-export async function updateUser(email: string, userData: Partial<UserFormData>): Promise<User | null> {
+export async function updateUser(email: string, userData: {
+  fullName?: string
+  phone?: string
+  documentType?: string
+  documentNumber?: string
+  country?: string
+}): Promise<DBUser | null> {
   try {
     console.log("Updating user:", email)
 
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    }
+    const updateData: Record<string, unknown> = {}
 
     if (userData.fullName) updateData.full_name = userData.fullName
     if (userData.phone) updateData.phone = userData.phone
-    if (userData.userType) updateData.user_type = userData.userType
-    if (userData.monthlyVolumeExpected) updateData.monthly_volume_expected = userData.monthlyVolumeExpected
-    if (userData.receivesThirdPartyPayments !== undefined)
-      updateData.receives_third_party_payments = userData.receivesThirdPartyPayments
-    if (userData.expectedThirdParties) updateData.expected_third_parties = userData.expectedThirdParties
-    if (userData.walletAddress) updateData.wallet_address = userData.walletAddress
+    if (userData.documentType) updateData.document_type = userData.documentType
+    if (userData.documentNumber) updateData.document_number = userData.documentNumber
+    if (userData.country) updateData.country = userData.country
 
     const { data: updatedUser, error } = await supabase
       .from("users")
@@ -87,70 +150,13 @@ export async function updateUser(email: string, userData: Partial<UserFormData>)
   }
 }
 
-export async function createOperation(operationData: OperationData): Promise<Operation | null> {
+export async function getOperationById(id: string): Promise<DBOperation | null> {
   try {
-    console.log("Creating operation:", operationData.id)
-
-    // Extract data from the correct structure
-    const userData = operationData.user
-    const quote = operationData.quote
-    const thirdParty = operationData.thirdParty
-    const isThirdPartyPayment = operationData.isThirdPartyPayment
-
-    // Verificar si es un pago de tercero y si necesita límite
-    const isNewThirdParty = isThirdPartyPayment && thirdParty
-    let thirdPartyLimitApplied = false
-
-    if (isNewThirdParty && thirdParty) {
-      // Verificar si este tercero ya ha hecho pagos antes
-      const { data: existingOperations } = await supabase
-        .from("operations")
-        .select("id")
-        .eq("payer_email", thirdParty.zelleAccount) // Use zelleAccount as identifier
-        .limit(1)
-
-      if (!existingOperations || existingOperations.length === 0) {
-        // Es un tercero nuevo, aplicar límite de $10
-        if (quote.amount > 10) {
-          console.error("Third party limit exceeded: $10 maximum for first operation")
-          return null
-        }
-        thirdPartyLimitApplied = true
-      }
-    }
-
-    // Crear operación usando solo los campos básicos que existen
-    const operationInsert = {
-      id: operationData.id,
-      user_email: userData.email,
-      amount: quote.amount,
-      currency: quote.currency,
-      result: quote.result,
-      payer_name: isThirdPartyPayment ? thirdParty?.name : userData.fullName,
-      payer_email: userData.email,
-      payer_phone: isThirdPartyPayment ? thirdParty?.phone : userData.phone,
-      payer_is_user: !isThirdPartyPayment,
-      status: "pending",
-    }
-
-    const { data: operation, error } = await supabase.from("operations").insert(operationInsert).select().single()
-
-    if (error) {
-      console.error("Error creating operation:", error)
-      return null
-    }
-
-    console.log("Operation created successfully:", operation.id)
-    return operation
-  } catch (error) {
-    console.error("Error in createOperation:", error)
-    return null
-  }
-}
-
-export async function getOperationById(id: string): Promise<Operation | null> {
-  try {
-    const { data: operation, error } = await supabase.from("operations").select("*").eq("id", id).single()
+    const { data: operation, error } = await supabase
+      .from("operations")
+      .select("*")
+      .eq("id", id)
+      .single()
 
     if (error) {
       console.error("Error getting operation:", error)
@@ -164,12 +170,35 @@ export async function getOperationById(id: string): Promise<Operation | null> {
   }
 }
 
+export async function getOperationByNumber(operationNumber: string): Promise<DBOperation | null> {
+  try {
+    const { data: operation, error } = await supabase
+      .from("operations")
+      .select("*")
+      .eq("operation_number", operationNumber)
+      .single()
+
+    if (error) {
+      console.error("Error getting operation by number:", error)
+      return null
+    }
+
+    return operation
+  } catch (error) {
+    console.error("Error in getOperationByNumber:", error)
+    return null
+  }
+}
+
 export async function updateOperationStatus(
   id: string,
-  status: "pending" | "completed" | "cancelled",
+  status: "pending" | "awaiting_payment" | "processing" | "completed" | "cancelled" | "expired"
 ): Promise<boolean> {
   try {
-    const { error } = await supabase.from("operations").update({ status }).eq("id", id)
+    const { error } = await supabase
+      .from("operations")
+      .update({ status })
+      .eq("id", id)
 
     if (error) {
       console.error("Error updating operation status:", error)
@@ -183,12 +212,29 @@ export async function updateOperationStatus(
   }
 }
 
-// Función para generar ID de operación
-export function generateOperationId(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let result = ""
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
+// Obtener tasa de cambio de la BD
+export async function getExchangeRate(currencyPair: string): Promise<{
+  rate: number
+  fee_percentage: number
+  min_amount: number
+  max_amount: number
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from("exchange_rates")
+      .select("rate, fee_percentage, min_amount, max_amount")
+      .eq("currency_pair", currencyPair)
+      .eq("is_active", true)
+      .single()
+
+    if (error) {
+      console.error("Error getting exchange rate:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error in getExchangeRate:", error)
+    return null
   }
-  return result
 }

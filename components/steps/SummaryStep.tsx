@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useFlow } from "@/contexts/FlowContext"
 import { createOperationViaAPI } from "@/lib/database-api"
-import { generateOperationId } from "@/lib/database"
 import type { OperationData } from "@/types/database"
 import { getCurrencyInfo, CURRENCY_PAIRS } from "@/types/database"
 import ProgressBar from "@/components/ProgressBar"
+import { generateOperationId } from "@/lib/utils" // Import generateOperationId
 
 export default function SummaryStep() {
   const { 
@@ -117,7 +117,8 @@ export default function SummaryStep() {
 
     try {
       const operationData: OperationData = {
-        id: generateOperationId(),
+        id: generateOperationId(), // Use generateOperationId
+        operationMode: operationMode || "send",
         quote,
         user,
         beneficiary: operationMode === "send" ? beneficiary ?? undefined : undefined,
