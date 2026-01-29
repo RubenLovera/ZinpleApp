@@ -82,15 +82,13 @@ export interface Operation {
 export interface QuoteData {
   amount: number
   result: number
-  exchangeRate: number
-  commissionRate: number
-  // Nuevos campos multi-par
-  mode: OperationMode
-  currencyPair: CurrencyPair
-  sourceCurrency: Currency
-  destinationCurrency: Currency
-  sourceCountry: string
-  destinationCountry: string
+  // Campos legacy (para compatibilidad)
+  currency?: "usdt" | "bolivares"
+  // Campos multi-par
+  sourceCurrency?: string
+  destinationCurrency?: string
+  rate?: number
+  fee?: number
 }
 
 // Datos del formulario de usuario

@@ -70,7 +70,7 @@ export default function PaymentTypeStep() {
               )}
             </div>
             <p className="text-gray-600">
-              Selecciona si tú realizarás el pago desde tu cuenta Zelle o si será un tercero
+              Selecciona si tú realizarás el pago desde tu cuenta o si será un tercero
             </p>
           </div>
 
@@ -116,7 +116,7 @@ export default function PaymentTypeStep() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900">Yo realizaré el pago</h3>
-                    <p className="text-gray-600">El pago se realizará desde mi propia cuenta Zelle</p>
+                    <p className="text-gray-600">El pago se realizará desde mi propia cuenta bancaria/billetera</p>
                     {!isUserExisting && (
                       <p className="text-sm text-purple-600 mt-1">• Completaremos tu perfil primero</p>
                     )}
@@ -151,7 +151,7 @@ export default function PaymentTypeStep() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900">Un tercero realizará el pago</h3>
-                    <p className="text-gray-600">El pago se realizará desde la cuenta Zelle de otra persona</p>
+                    <p className="text-gray-600">El pago se realizará desde la cuenta bancaria/billetera de otra persona</p>
                     {!isUserExisting && (
                       <p className="text-sm text-purple-600 mt-1">• Completaremos tu perfil y los datos del tercero</p>
                     )}
