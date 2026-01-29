@@ -19,7 +19,10 @@ export default function TermsStep() {
 
   const handleContinue = () => {
     if (!termsAccepted) return
-    setCurrentStep(getNextStep("terms"))
+    const nextStep = getNextStep("terms")
+    console.log("[v0] TermsStep - operationMode:", operationMode)
+    console.log("[v0] TermsStep - getNextStep('terms') returned:", nextStep)
+    setCurrentStep(nextStep)
   }
 
   // Obtener información de las monedas
