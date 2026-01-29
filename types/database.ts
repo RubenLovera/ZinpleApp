@@ -165,6 +165,7 @@ export interface ThirdPartyData {
 // Datos completos de la operación
 export interface OperationData {
   id: string
+  operationMode?: OperationMode
   quote: QuoteData
   user: UserFormData
   beneficiary?: BeneficiaryData

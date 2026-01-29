@@ -1,191 +1,224 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import type { OperationData } from "@/types/database"
-import { isAmountWithinLimit, calculateUserLimit } from "@/lib/limits"
-import {
-  sendWelcomeEmail,
-  sendOperationCreatedEmail,
-  sendOperationCompletedEmail,
-  sendOperationCancelledEmail,
-} from "@/lib/email-service"
+import type { OperationMode } from "@/types/database"
 
 // Cliente servidor con Service Role Key
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// Tipos para la request
+interface CreateOperationRequest {
+  mode: OperationMode
+  currencyPair: string
+  sourceCurrency: string
+  destinationCurrency: string
+  sourceAmount: number
+  destinationAmount: number
+  exchangeRate: number
+  feePercentage: number
+  feeAmount: number
+  // Datos del usuario que crea
+  user: {
+    email: string
+    fullName?: string
+    phone?: string
+    documentType?: string
+    documentNumber?: string
+    country?: string
+  }
+  // Datos del beneficiario (modo send)
+  beneficiary?: {
+    fullName: string
+    phone: string
+    email?: string
+    bankCode?: string
+    bankName?: string
+    walletAddress?: string
+  }
+  // Datos del remitente (modo receive)
+  sender?: {
+    fullName: string
+    email?: string
+    phone?: string
+    country?: string
+  }
+  // Datos de destino (pago móvil, wallet, etc.)
+  destination?: {
+    bankCode?: string
+    bankName?: string
+    phone?: string
+    document?: string
+    walletAddress?: string
+  }
+  // Método de pago
+  paymentMethod?: string
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const requestData: OperationData = await request.json()
+    const requestData: CreateOperationRequest = await request.json()
 
-    console.log("API: Creating operation:", requestData.id)
-    console.log("API: Request data structure:", JSON.stringify(requestData, null, 2))
+    console.log("API: Creating operation with mode:", requestData.mode)
 
-    // Extract user data from the correct structure
-    const userData = requestData.user
-    const quote = requestData.quote
-    const thirdParty = requestData.thirdParty
-    const isThirdPartyPayment = requestData.isThirdPartyPayment
+    const { user, beneficiary, sender, destination } = requestData
 
-    if (!userData || !userData.email) {
-      console.error("Missing user data or email")
-      return NextResponse.json({ error: "Missing user data" }, { status: 400 })
+    if (!user?.email) {
+      return NextResponse.json({ error: "Email de usuario requerido" }, { status: 400 })
     }
 
-    // Verificar límites de seguridad ANTES de crear la operación
-    console.log("API: Checking security limits for amount:", quote.amount)
+    if (!requestData.mode || !requestData.currencyPair) {
+      return NextResponse.json({ error: "Modo y par de divisas requeridos" }, { status: 400 })
+    }
 
-    // Verificar si es usuario nuevo y obtener operaciones completadas
+    // 1. Buscar o crear usuario
+    let dbUser = null
     const { data: existingUser, error: userCheckError } = await supabaseAdmin
       .from("users")
       .select("*")
-      .eq("email", userData.email)
+      .eq("email", user.email)
       .single()
 
     if (userCheckError && userCheckError.code !== "PGRST116") {
-      console.error("Error checking for existing user:", userCheckError)
-      return NextResponse.json({ error: "Failed to check user" }, { status: 500 })
+      console.error("Error checking user:", userCheckError)
+      return NextResponse.json({ error: "Error verificando usuario" }, { status: 500 })
     }
-
-    const isUserExisting = !!existingUser
-    const completedOperations = existingUser?.completed_operations || 0
-
-    console.log("API: User existing status:", isUserExisting)
-    console.log("API: User completed operations:", completedOperations)
-
-    // VALIDACIÓN DE LÍMITES usando el nuevo sistema
-    const limitCheck = isAmountWithinLimit(quote.amount, completedOperations, isThirdPartyPayment)
-
-    if (!limitCheck.isValid) {
-      console.error("API: Amount exceeds limit:", quote.amount, "Current limit:", limitCheck.currentLimit)
-      return NextResponse.json(
-        {
-          error: limitCheck.message || `El monto excede tu límite actual de $${limitCheck.currentLimit} USD.`,
-        },
-        { status: 400 },
-      )
-    }
-
-    console.log("API: Security limits passed, proceeding with operation creation")
-
-    // Crear o actualizar usuario
-    let user
-    let isNewUser = false
 
     if (existingUser) {
-      console.log("API: Updating existing user")
-      const updateData = {
-        full_name: userData.fullName,
-        phone: userData.phone || existingUser.phone,
-        wallet_address: userData.walletAddress || existingUser.wallet_address,
-        user_type: userData.userType || existingUser.user_type,
-        monthly_volume_expected: userData.monthlyVolumeExpected || existingUser.monthly_volume_expected,
-        receives_third_party_payments:
-          userData.receivesThirdPartyPayments ?? existingUser.receives_third_party_payments,
-        expected_third_parties: userData.expectedThirdParties || existingUser.expected_third_parties,
-        updated_at: new Date().toISOString(),
+      // Actualizar usuario existente si hay datos nuevos
+      const updateData: Record<string, unknown> = {}
+      if (user.fullName && user.fullName !== existingUser.full_name) {
+        updateData.full_name = user.fullName
       }
+      if (user.phone && user.phone !== existingUser.phone) {
+        updateData.phone = user.phone
+      }
+      if (user.documentType) updateData.document_type = user.documentType
+      if (user.documentNumber) updateData.document_number = user.documentNumber
+      if (user.country) updateData.country = user.country
 
-      console.log("API: Update data:", updateData)
+      if (Object.keys(updateData).length > 0) {
+        const { data: updated, error: updateError } = await supabaseAdmin
+          .from("users")
+          .update(updateData)
+          .eq("email", user.email)
+          .select()
+          .single()
 
-      const { data: updatedUser, error } = await supabaseAdmin
+        if (updateError) {
+          console.error("Error updating user:", updateError)
+        } else {
+          dbUser = updated
+        }
+      } else {
+        dbUser = existingUser
+      }
+    } else {
+      // Crear nuevo usuario
+      const { data: newUser, error: createError } = await supabaseAdmin
         .from("users")
-        .update(updateData)
-        .eq("email", userData.email)
+        .insert({
+          email: user.email,
+          full_name: user.fullName || null,
+          phone: user.phone || null,
+          document_type: user.documentType || null,
+          document_number: user.documentNumber || null,
+          country: user.country || null,
+        })
         .select()
         .single()
 
-      if (error) {
-        console.error("Error updating user:", error)
-        return NextResponse.json({ error: `Failed to update user: ${error.message}` }, { status: 500 })
+      if (createError) {
+        console.error("Error creating user:", createError)
+        return NextResponse.json({ error: `Error creando usuario: ${createError.message}` }, { status: 500 })
       }
-      user = updatedUser
-    } else {
-      console.log("API: Creating new user")
-      isNewUser = true
-
-      const insertData = {
-        email: userData.email,
-        full_name: userData.fullName,
-        phone: userData.phone || "",
-        wallet_address: userData.walletAddress || null,
-        user_type: userData.userType || "persona",
-        monthly_volume_expected: userData.monthlyVolumeExpected || 0,
-        receives_third_party_payments: userData.receivesThirdPartyPayments || false,
-        expected_third_parties: userData.expectedThirdParties || 0,
-        current_limit: 10, // Límite inicial
-        completed_operations: 0,
-      }
-
-      console.log("API: Insert data:", insertData)
-
-      const { data: newUser, error } = await supabaseAdmin.from("users").insert(insertData).select().single()
-
-      if (error) {
-        console.error("Error creating user:", error)
-        return NextResponse.json({ error: `Failed to create user: ${error.message}` }, { status: 500 })
-      }
-      user = newUser
+      dbUser = newUser
     }
 
-    console.log("API: User processed successfully:", user.email)
-
-    // Crear operación - usando solo los campos básicos que existen en el esquema
-    const operationInsert = {
-      id: requestData.id,
-      user_email: userData.email,
-      amount: quote.amount,
-      currency: quote.currency,
-      result: quote.result,
-      payer_name: isThirdPartyPayment ? thirdParty?.name : userData.fullName,
-      payer_email: userData.email,
-      payer_phone: isThirdPartyPayment ? thirdParty?.phone : userData.phone,
-      payer_is_user: !isThirdPartyPayment,
+    // 2. Crear la operación
+    const operationData: Record<string, unknown> = {
+      mode: requestData.mode,
       status: "pending",
+      currency_pair: requestData.currencyPair,
+      source_currency: requestData.sourceCurrency,
+      destination_currency: requestData.destinationCurrency,
+      source_amount: requestData.sourceAmount,
+      destination_amount: requestData.destinationAmount,
+      exchange_rate: requestData.exchangeRate,
+      fee_percentage: requestData.feePercentage,
+      fee_amount: requestData.feeAmount,
+      // Datos del usuario
+      user_id: dbUser?.id || null,
+      user_email: user.email,
+      user_phone: user.phone || null,
+      user_full_name: user.fullName || null,
+      user_document_type: user.documentType || null,
+      user_document_number: user.documentNumber || null,
+      user_country: user.country || null,
+      // Método de pago
+      payment_method: requestData.paymentMethod || null,
     }
 
-    console.log("API: Creating operation with validated data:", operationInsert)
+    // Agregar datos del beneficiario si aplica
+    if (beneficiary) {
+      operationData.beneficiary_full_name = beneficiary.fullName
+      operationData.beneficiary_phone = beneficiary.phone
+      operationData.beneficiary_email = beneficiary.email || null
+      operationData.beneficiary_bank_code = beneficiary.bankCode || null
+      operationData.beneficiary_bank_name = beneficiary.bankName || null
+      operationData.beneficiary_wallet_address = beneficiary.walletAddress || null
+    }
+
+    // Agregar datos del remitente si aplica (modo receive)
+    if (sender) {
+      operationData.sender_full_name = sender.fullName
+      operationData.sender_email = sender.email || null
+      operationData.sender_phone = sender.phone || null
+      operationData.sender_country = sender.country || null
+    }
+
+    // Agregar datos de destino si aplica
+    if (destination) {
+      operationData.destination_bank_code = destination.bankCode || null
+      operationData.destination_bank_name = destination.bankName || null
+      operationData.destination_phone = destination.phone || null
+      operationData.destination_document = destination.document || null
+      operationData.destination_wallet_address = destination.walletAddress || null
+    }
+
+    console.log("API: Inserting operation:", operationData)
 
     const { data: operation, error: operationError } = await supabaseAdmin
       .from("operations")
-      .insert(operationInsert)
+      .insert(operationData)
       .select()
       .single()
 
     if (operationError) {
       console.error("Error creating operation:", operationError)
-      return NextResponse.json({ error: `Failed to create operation: ${operationError.message}` }, { status: 500 })
+      return NextResponse.json({ error: `Error creando operación: ${operationError.message}` }, { status: 500 })
     }
 
-    console.log("API: Operation created successfully with limits validated:", operation.id)
+    // 3. Registrar en operation_logs
+    await supabaseAdmin.from("operation_logs").insert({
+      operation_id: operation.id,
+      previous_status: null,
+      new_status: "pending",
+      changed_by: "system",
+      notes: "Operación creada",
+    })
 
-    // ENVIAR EMAILS DE NOTIFICACIÓN
-    try {
-      // 1. Email de bienvenida para usuarios nuevos
-      if (isNewUser) {
-        console.log("API: Sending welcome email to new user:", userData.email)
-        await sendWelcomeEmail(userData.email, userData.fullName)
-      }
+    console.log("API: Operation created successfully:", operation.operation_number)
 
-      // 2. Email de operación creada
-      console.log("API: Sending operation created email:", operation.id)
-      await sendOperationCreatedEmail(
-        userData.email,
-        userData.fullName,
-        operation.id,
-        quote.amount,
-        quote.currency,
-        quote.result,
-        isThirdPartyPayment,
-        thirdParty?.name,
-      )
-    } catch (emailError) {
-      console.error("Error sending notification emails:", emailError)
-      // No fallar la operación por errores de email
-    }
+    return NextResponse.json({ 
+      operation,
+      message: "Operación creada exitosamente" 
+    }, { status: 201 })
 
-    return NextResponse.json({ operation }, { status: 201 })
   } catch (error) {
     console.error("Error in POST /api/operations:", error)
-    return NextResponse.json({ error: `Internal server error: ${error}` }, { status: 500 })
+    return NextResponse.json({ error: `Error interno: ${error}` }, { status: 500 })
   }
 }
 
@@ -193,125 +226,86 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
+    const operationNumber = searchParams.get("operation_number")
 
-    if (!id) {
-      return NextResponse.json({ error: "Operation ID is required" }, { status: 400 })
+    if (!id && !operationNumber) {
+      return NextResponse.json({ error: "Se requiere ID o número de operación" }, { status: 400 })
     }
 
-    const { data: operation, error } = await supabaseAdmin.from("operations").select("*").eq("id", id).single()
+    let query = supabaseAdmin.from("operations").select("*")
+    
+    if (id) {
+      query = query.eq("id", id)
+    } else if (operationNumber) {
+      query = query.eq("operation_number", operationNumber)
+    }
+
+    const { data: operation, error } = await query.single()
 
     if (error) {
       console.error("Error getting operation:", error)
-      return NextResponse.json({ error: "Operation not found" }, { status: 404 })
+      return NextResponse.json({ error: "Operación no encontrada" }, { status: 404 })
     }
 
     return NextResponse.json({ operation })
   } catch (error) {
     console.error("Error in GET /api/operations:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Error interno" }, { status: 500 })
   }
 }
 
-// Nuevo endpoint para completar operaciones y actualizar límites
 export async function PATCH(request: NextRequest) {
   try {
-    const { operationId, status, reason } = await request.json()
+    const { operationId, status, changedBy, notes } = await request.json()
 
     if (!operationId || !status) {
-      return NextResponse.json({ error: "Operation ID and status are required" }, { status: 400 })
+      return NextResponse.json({ error: "ID y estado requeridos" }, { status: 400 })
     }
 
-    // Actualizar el estado de la operación
+    // Obtener estado actual
+    const { data: currentOp, error: getError } = await supabaseAdmin
+      .from("operations")
+      .select("status")
+      .eq("id", operationId)
+      .single()
+
+    if (getError) {
+      return NextResponse.json({ error: "Operación no encontrada" }, { status: 404 })
+    }
+
+    // Actualizar operación
+    const updateData: Record<string, unknown> = { status }
+    
+    if (status === "completed") {
+      updateData.completed_at = new Date().toISOString()
+    } else if (status === "cancelled") {
+      updateData.cancelled_at = new Date().toISOString()
+    }
+
     const { data: operation, error: updateError } = await supabaseAdmin
       .from("operations")
-      .update({ status })
+      .update(updateData)
       .eq("id", operationId)
       .select()
       .single()
 
     if (updateError) {
       console.error("Error updating operation:", updateError)
-      return NextResponse.json({ error: "Failed to update operation" }, { status: 500 })
+      return NextResponse.json({ error: "Error actualizando operación" }, { status: 500 })
     }
 
-    // Obtener datos del usuario para los emails
-    const { data: currentUser, error: getUserError } = await supabaseAdmin
-      .from("users")
-      .select("*")
-      .eq("email", operation.user_email)
-      .single()
-
-    if (getUserError) {
-      console.error("Error getting user for email:", getUserError)
-    }
-
-    // Si la operación se completó exitosamente, actualizar el contador del usuario
-    if (status === "completed") {
-      if (currentUser) {
-        // Calcular nuevo límite basado en operaciones completadas
-        const newCompletedOperations = (currentUser.completed_operations || 0) + 1
-        const newLimit = calculateUserLimit(newCompletedOperations)
-
-        // Actualizar usuario con nuevo contador y límite
-        const { error: userUpdateError } = await supabaseAdmin
-          .from("users")
-          .update({
-            completed_operations: newCompletedOperations,
-            current_limit: newLimit,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("email", operation.user_email)
-
-        if (userUpdateError) {
-          console.error("Error updating user completed operations:", userUpdateError)
-          // No fallar la operación por esto, solo logear el error
-        } else {
-          console.log(
-            `User ${operation.user_email} limit updated to $${newLimit} after ${newCompletedOperations} completed operations`,
-          )
-
-          // ENVIAR EMAIL DE OPERACIÓN COMPLETADA
-          try {
-            console.log("API: Sending operation completed email:", operation.id)
-            await sendOperationCompletedEmail(
-              currentUser.email,
-              currentUser.full_name,
-              operation.id,
-              operation.amount,
-              operation.currency,
-              operation.result,
-              newLimit,
-            )
-          } catch (emailError) {
-            console.error("Error sending operation completed email:", emailError)
-            // No fallar la operación por errores de email
-          }
-        }
-      }
-    }
-
-    // Si la operación se canceló, enviar email de cancelación
-    if (status === "cancelled" && currentUser) {
-      try {
-        console.log("API: Sending operation cancelled email:", operation.id)
-        await sendOperationCancelledEmail(
-          currentUser.email,
-          currentUser.full_name,
-          operation.id,
-          operation.amount,
-          operation.currency,
-          operation.result,
-          reason, // Pasar el motivo de cancelación
-        )
-      } catch (emailError) {
-        console.error("Error sending operation cancelled email:", emailError)
-        // No fallar la operación por errores de email
-      }
-    }
+    // Registrar cambio en logs
+    await supabaseAdmin.from("operation_logs").insert({
+      operation_id: operationId,
+      previous_status: currentOp.status,
+      new_status: status,
+      changed_by: changedBy || "system",
+      notes: notes || null,
+    })
 
     return NextResponse.json({ operation })
   } catch (error) {
     console.error("Error in PATCH /api/operations:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Error interno" }, { status: 500 })
   }
 }
