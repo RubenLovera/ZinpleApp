@@ -2,9 +2,10 @@
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { ChevronDown, ArrowRight, Send, Download, Wallet, RefreshCw } from "lucide-react"
+import { ChevronDown, ArrowRight, Send, Download, Wallet, RefreshCw, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useFlow } from "@/contexts/FlowContext"
+import useSWR from "swr"
 
 type OperationMode = "send" | "receive" | "buy_usdt" | "sell_usdt"
 
@@ -14,6 +15,15 @@ interface CurrencyOption {
   flag: string
   symbol: string
   country: string
+}
+
+interface ExchangeRate {
+  rate: number
+  fee: number
+  minAmount: number
+  maxAmount: number
+  sourceCurrency: string
+  destinationCurrency: string
 }
 
 // Monedas disponibles
@@ -29,30 +39,10 @@ const currencies: Record<string, CurrencyOption> = {
   USDT: { code: "USDT", name: "Tether", flag: "/flags/usdt.svg", symbol: "₮", country: "Crypto" },
 }
 
-// Pares disponibles y sus tasas mock
-const exchangeRates: Record<string, { rate: number; fee: number }> = {
-  "USD-VES": { rate: 125, fee: 0.08 },
-  "EUR-VES": { rate: 135, fee: 0.08 },
-  "CLP-VES": { rate: 0.13, fee: 0.05 },
-  "MXN-VES": { rate: 6.1, fee: 0.05 },
-  "PEN-VES": { rate: 33, fee: 0.05 },
-  "BRL-VES": { rate: 24, fee: 0.05 },
-  "COP-VES": { rate: 0.028, fee: 0.05 },
-  "USDT-VES": { rate: 125, fee: 0.03 },
-  "CLP-PEN": { rate: 0.0041, fee: 0.04 },
-  "USD-USDT": { rate: 0.91, fee: 0.09 },
-  "EUR-USDT": { rate: 0.98, fee: 0.09 },
-}
+// Fetcher para SWR
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-// Monedas origen según modo
-const sourceCurrenciesByMode: Record<OperationMode, string[]> = {
-  send: ["USD", "EUR", "CLP", "MXN", "PEN", "BRL", "COP"],
-  receive: ["USD", "EUR", "CLP", "MXN", "PEN", "BRL", "COP"],
-  buy_usdt: ["USD", "EUR"],
-  sell_usdt: ["USDT"],
-}
-
-// Monedas destino según modo
+// Monedas destino según modo (base, se filtrará por pares activos)
 const destCurrenciesByMode: Record<OperationMode, string[]> = {
   send: ["VES"],
   receive: ["VES"],
@@ -104,6 +94,18 @@ const modeConfig: Record<OperationMode, {
 
 export default function MultiCurrencyCalculator() {
   const { setQuote, setCurrentStep, setOperationMode } = useFlow()
+  
+  // Cargar tasas desde API con SWR (revalida cada 30 segundos)
+  const { data: ratesData, error: ratesError, isLoading: ratesLoading } = useSWR<{
+    rates: Record<string, ExchangeRate>
+    updatedAt: string
+  }>("/api/rates", fetcher, {
+    refreshInterval: 30000, // Revalidar cada 30 segundos
+    revalidateOnFocus: true,
+  })
+
+  const exchangeRates = ratesData?.rates || {}
+  
   const [mode, setMode] = useState<OperationMode>("send")
   const [amount, setAmount] = useState("")
   const [sourceCurrency, setSourceCurrency] = useState("USD")
@@ -119,6 +121,28 @@ export default function MultiCurrencyCalculator() {
   
   const sourceDropdownRef = useRef<HTMLDivElement>(null)
   const destDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Calcular monedas origen disponibles basadas en pares activos
+  const getAvailableSourceCurrencies = (currentMode: OperationMode): string[] => {
+    const destCurrencies = destCurrenciesByMode[currentMode]
+    const availableSources = new Set<string>()
+    
+    Object.keys(exchangeRates).forEach((pairKey) => {
+      const [source, dest] = pairKey.split("-")
+      if (destCurrencies.includes(dest)) {
+        // Filtrar por modo
+        if (currentMode === "sell_usdt" && source === "USDT") {
+          availableSources.add(source)
+        } else if (currentMode === "buy_usdt" && dest === "USDT") {
+          availableSources.add(source)
+        } else if ((currentMode === "send" || currentMode === "receive") && dest === "VES" && source !== "USDT") {
+          availableSources.add(source)
+        }
+      }
+    })
+    
+    return Array.from(availableSources)
+  }
 
   // Detectar mobile
   useEffect(() => {
@@ -142,18 +166,18 @@ export default function MultiCurrencyCalculator() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Actualizar monedas cuando cambia el modo
+  // Actualizar monedas cuando cambia el modo o las tasas
   useEffect(() => {
-    const sourceCurrencies = sourceCurrenciesByMode[mode]
+    const sourceCurrencies = getAvailableSourceCurrencies(mode)
     const destCurrencies = destCurrenciesByMode[mode]
     
-    if (!sourceCurrencies.includes(sourceCurrency)) {
+    if (sourceCurrencies.length > 0 && !sourceCurrencies.includes(sourceCurrency)) {
       setSourceCurrency(sourceCurrencies[0])
     }
     if (!destCurrencies.includes(destCurrency)) {
       setDestCurrency(destCurrencies[0])
     }
-  }, [mode])
+  }, [mode, exchangeRates])
 
   // Calcular resultado
   useEffect(() => {
@@ -171,7 +195,7 @@ export default function MultiCurrencyCalculator() {
       setCurrentRate(0)
       setCurrentFee(0)
     }
-  }, [amount, sourceCurrency, destCurrency])
+  }, [amount, sourceCurrency, destCurrency, exchangeRates])
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -217,7 +241,7 @@ export default function MultiCurrencyCalculator() {
   }
 
   const config = modeConfig[mode]
-  const availableSourceCurrencies = sourceCurrenciesByMode[mode]
+  const availableSourceCurrencies = getAvailableSourceCurrencies(mode)
   const availableDestCurrencies = destCurrenciesByMode[mode]
 
   const renderCurrencySelector = (
@@ -274,25 +298,80 @@ export default function MultiCurrencyCalculator() {
     )
   }
 
+  // Loading state
+  if (ratesLoading) {
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="bg-background rounded-2xl p-8 shadow-2xl flex items-center justify-center min-h-[300px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Cargando tasas de cambio...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (ratesError) {
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="bg-background rounded-2xl p-8 shadow-2xl flex items-center justify-center min-h-[300px]">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+              <RefreshCw className="w-6 h-6 text-destructive" />
+            </div>
+            <p className="text-muted-foreground">Error al cargar las tasas de cambio</p>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // No rates available
+  if (Object.keys(exchangeRates).length === 0) {
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="bg-background rounded-2xl p-8 shadow-2xl flex items-center justify-center min-h-[300px]">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <Wallet className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground">No hay pares de divisas disponibles en este momento</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Mode Selector */}
       <div className="flex flex-wrap justify-center gap-2 mb-6">
-        {(Object.keys(modeConfig) as OperationMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
-              mode === m
-                ? "bg-background text-primary shadow-lg"
-                : "bg-white/20 text-white/90 hover:bg-white/30"
-            }`}
-          >
-            {modeConfig[m].icon}
-            <span className="hidden sm:inline">{modeConfig[m].label}</span>
-            <span className="sm:hidden">{modeConfig[m].label.split(" ")[0]}</span>
-          </button>
-        ))}
+        {(Object.keys(modeConfig) as OperationMode[]).map((m) => {
+          const hasRatesForMode = getAvailableSourceCurrencies(m).length > 0
+          return (
+            <button
+              key={m}
+              onClick={() => hasRatesForMode && setMode(m)}
+              disabled={!hasRatesForMode}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
+                mode === m
+                  ? "bg-background text-primary shadow-lg"
+                  : hasRatesForMode
+                    ? "bg-white/20 text-white/90 hover:bg-white/30"
+                    : "bg-white/10 text-white/40 cursor-not-allowed"
+              }`}
+            >
+              {modeConfig[m].icon}
+              <span className="hidden sm:inline">{modeConfig[m].label}</span>
+              <span className="sm:hidden">{modeConfig[m].label.split(" ")[0]}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Calculator Card */}
