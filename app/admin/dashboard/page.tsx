@@ -1,8 +1,7 @@
 "use client"
 
 import React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,17 +33,23 @@ import {
   Wallet,
   Send,
   Download,
-  AlertCircle,
   Eye,
-  Play,
   RotateCcw,
   Search,
-  Filter,
   ChevronLeft,
   ChevronRight,
   Edit2,
   Save,
   X,
+  Plus,
+  GripVertical,
+  Trash2,
+  Power,
+  Calendar,
+  ArrowRight,
+  AlertTriangle,
+  Copy,
+  Check,
 } from "lucide-react"
 
 interface Stats {
@@ -89,9 +94,24 @@ interface Operation {
   fee_percentage: number
   user_email: string
   user_full_name: string
+  user_phone?: string
+  user_document_type?: string
+  user_document_number?: string
   beneficiary_full_name?: string
   beneficiary_phone?: string
   beneficiary_bank_name?: string
+  beneficiary_bank_code?: string
+  beneficiary_account_number?: string
+  beneficiary_document_type?: string
+  beneficiary_document_number?: string
+  sender_full_name?: string
+  sender_email?: string
+  destination_bank_name?: string
+  destination_account_number?: string
+  wallet_address?: string
+  wallet_network?: string
+  payment_reference?: string
+  admin_notes?: string
   created_at: string
   completed_at?: string
   cancelled_at?: string
@@ -108,6 +128,7 @@ interface Rate {
   max_amount: number
   is_active: boolean
   provider?: string
+  display_order?: number
   updated_at: string
   updated_by?: string
 }
@@ -151,6 +172,19 @@ const modeIcons: Record<string, React.ReactNode> = {
   sell_usdt: <DollarSign className="h-4 w-4" />,
 }
 
+const currencyFlags: Record<string, string> = {
+  USD: "🇺🇸",
+  EUR: "🇪🇺",
+  VES: "🇻🇪",
+  COP: "🇨🇴",
+  MXN: "🇲🇽",
+  ARS: "🇦🇷",
+  BRL: "🇧🇷",
+  CLP: "🇨🇱",
+  PEN: "🇵🇪",
+  USDT: "₮",
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
@@ -167,16 +201,35 @@ export default function AdminDashboard() {
     status: "all",
     mode: "all",
     search: "",
+    dateFrom: "",
+    dateTo: "",
   })
   const [selectedOperation, setSelectedOperation] = useState<Operation | null>(null)
   const [operationLogs, setOperationLogs] = useState<OperationLog[]>([])
   const [actionLoading, setActionLoading] = useState(false)
+  const [actionNotes, setActionNotes] = useState("")
 
   // Rates state
   const [rates, setRates] = useState<Rate[]>([])
   const [ratesLoading, setRatesLoading] = useState(false)
   const [editingRate, setEditingRate] = useState<string | null>(null)
-  const [editRateValues, setEditRateValues] = useState<{rate: string, fee: string}>({rate: "", fee: ""})
+  const [editRateValues, setEditRateValues] = useState<{rate: string, fee: string, min: string, max: string}>({rate: "", fee: "", min: "", max: ""})
+  const [showNewRateForm, setShowNewRateForm] = useState(false)
+  const [newRate, setNewRate] = useState({
+    sourceCurrency: "",
+    destinationCurrency: "",
+    rate: "",
+    feePercentage: "5",
+    minAmount: "1",
+    maxAmount: "10000",
+  })
+
+  // Settings state
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [newAdminEmail, setNewAdminEmail] = useState("")
+  const [newAdminPassword, setNewAdminPassword] = useState("")
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("zinple_admin_auth")
@@ -222,6 +275,8 @@ export default function AdminDashboard() {
       if (operationsFilter.status !== "all") params.set("status", operationsFilter.status)
       if (operationsFilter.mode !== "all") params.set("mode", operationsFilter.mode)
       if (operationsFilter.search) params.set("search", operationsFilter.search)
+      if (operationsFilter.dateFrom) params.set("date_from", operationsFilter.dateFrom)
+      if (operationsFilter.dateTo) params.set("date_to", operationsFilter.dateTo)
 
       const response = await fetch(`/api/admin/operations?${params}`)
       const data = await response.json()
@@ -239,7 +294,11 @@ export default function AdminDashboard() {
     try {
       const response = await fetch("/api/admin/rates")
       const data = await response.json()
-      setRates(data.rates || [])
+      // Sort by display_order
+      const sortedRates = (data.rates || []).sort((a: Rate, b: Rate) => 
+        (a.display_order || 0) - (b.display_order || 0)
+      )
+      setRates(sortedRates)
     } catch (error) {
       console.error("Error fetching rates:", error)
     } finally {
@@ -264,7 +323,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleOperationAction = async (action: string, notes?: string) => {
+  const handleOperationAction = async (action: string) => {
     if (!selectedOperation) return
     setActionLoading(true)
     try {
@@ -275,11 +334,12 @@ export default function AdminDashboard() {
           operationId: selectedOperation.id,
           action,
           adminEmail,
-          notes,
+          notes: actionNotes,
         }),
       })
       const data = await response.json()
       if (data.success) {
+        setActionNotes("")
         await fetchOperationDetail(selectedOperation.id)
         await fetchOperations()
         await fetchStats()
@@ -304,6 +364,8 @@ export default function AdminDashboard() {
           rateId,
           rate: parseFloat(editRateValues.rate),
           feePercentage: parseFloat(editRateValues.fee),
+          minAmount: parseFloat(editRateValues.min),
+          maxAmount: parseFloat(editRateValues.max),
           adminEmail,
           reason: "Actualización manual desde dashboard",
         }),
@@ -319,6 +381,51 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Error updating rate:", error)
       alert("Error al actualizar tasa")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleCreateRate = async () => {
+    if (!newRate.sourceCurrency || !newRate.destinationCurrency || !newRate.rate) {
+      alert("Completa todos los campos requeridos")
+      return
+    }
+    setActionLoading(true)
+    try {
+      const currencyPair = `${newRate.sourceCurrency}-${newRate.destinationCurrency}`
+      const response = await fetch("/api/admin/rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currencyPair,
+          sourceCurrency: newRate.sourceCurrency,
+          destinationCurrency: newRate.destinationCurrency,
+          rate: parseFloat(newRate.rate),
+          feePercentage: parseFloat(newRate.feePercentage) / 100,
+          minAmount: parseFloat(newRate.minAmount),
+          maxAmount: parseFloat(newRate.maxAmount),
+          adminEmail,
+        }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setShowNewRateForm(false)
+        setNewRate({
+          sourceCurrency: "",
+          destinationCurrency: "",
+          rate: "",
+          feePercentage: "5",
+          minAmount: "1",
+          maxAmount: "10000",
+        })
+        await fetchRates()
+      } else {
+        alert(data.error || "Error al crear tasa")
+      }
+    } catch (error) {
+      console.error("Error creating rate:", error)
+      alert("Error al crear tasa")
     } finally {
       setActionLoading(false)
     }
@@ -344,16 +451,37 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleDeleteRate = async (rateId: string) => {
+    if (!confirm("¿Estás seguro de eliminar este par? Se desactivará permanentemente.")) return
+    try {
+      const response = await fetch(`/api/admin/rates?id=${rateId}&admin_email=${adminEmail}`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      if (data.success) {
+        await fetchRates()
+      }
+    } catch (error) {
+      console.error("Error deleting rate:", error)
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem("zinple_admin_auth")
     localStorage.removeItem("adminEmail")
     router.push("/admin")
   }
 
-  const formatCurrency = (amount: number) => {
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  const formatCurrency = (amount: number, decimals = 2) => {
     return new Intl.NumberFormat("es-CL", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     }).format(amount)
   }
 
@@ -361,9 +489,29 @@ export default function AdminDashboard() {
     return new Date(dateString).toLocaleString("es-CL", {
       day: "2-digit",
       month: "2-digit",
+      year: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  const formatDateShort = (dateString: string) => {
+    return new Date(dateString).toLocaleString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  // Calculate preview for rate
+  const calculatePreview = (rate: Rate) => {
+    const testAmount = 100
+    const received = testAmount * rate.rate * (1 - rate.fee_percentage)
+    return {
+      send: testAmount,
+      receive: received,
+    }
   }
 
   if (loading && !stats) {
@@ -381,6 +529,10 @@ export default function AdminDashboard() {
     (stats?.byStatus.pending || 0) +
     (stats?.byStatus.awaiting_payment || 0) +
     (stats?.byStatus.processing || 0)
+
+  // Separate rates by type
+  const mainRates = rates.filter(r => r.currency_pair === "USD-VES" || r.currency_pair === "VES-USDT")
+  const otherRates = rates.filter(r => r.currency_pair !== "USD-VES" && r.currency_pair !== "VES-USDT")
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -524,7 +676,7 @@ export default function AdminDashboard() {
                     <div key={mode} className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground flex items-center gap-2">
                         {modeIcons[mode]}
-                        {modeLabels[mode]}
+                        {modeLabels[mode] || mode}
                       </span>
                       <span className="font-semibold">{count}</span>
                     </div>
@@ -532,33 +684,6 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    Top Pares de Divisas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {stats?.topCurrencyPairs.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Sin datos aún</p>
-                  )}
-                  {stats?.topCurrencyPairs.map((item, index) => (
-                    <div key={item.pair} className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                        {item.pair.replace("_", " / ")}
-                      </span>
-                      <span className="font-semibold">{item.count}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-3">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -571,83 +696,77 @@ export default function AdminDashboard() {
                   <p className="text-sm text-muted-foreground">Usuarios registrados</p>
                 </CardContent>
               </Card>
+            </div>
 
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Operaciones Recientes</CardTitle>
-                  <CardDescription>Últimas operaciones</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {stats?.recentOperations?.length === 0 && (
-                      <p className="text-sm text-muted-foreground">Sin operaciones aún</p>
-                    )}
-                    {stats?.recentOperations?.slice(0, 5).map((op) => (
-                      <div
-                        key={op.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                        onClick={() => {
-                          setActiveTab("operations")
-                          fetchOperationDetail(op.id)
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Badge className={statusColors[op.status]}>{statusLabels[op.status]}</Badge>
-                          <div>
-                            <p className="text-sm font-medium">{op.operation_number}</p>
-                            <p className="text-xs text-muted-foreground">{op.user_email}</p>
-                          </div>
+            {/* Recent Operations */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Operaciones Recientes</CardTitle>
+                <CardDescription>Últimas 5 operaciones</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stats?.recentOperations?.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">Sin operaciones recientes</p>
+                  )}
+                  {stats?.recentOperations?.slice(0, 5).map((op) => (
+                    <div key={op.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          {modeIcons[op.mode]}
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">
-                            {formatCurrency(op.source_amount)} {op.source_currency}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{formatDate(op.created_at)}</p>
+                        <div>
+                          <p className="font-medium text-sm">{op.operation_number}</p>
+                          <p className="text-xs text-muted-foreground">{op.user_email}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">
+                          {formatCurrency(op.source_amount)} {op.source_currency}
+                        </p>
+                        <Badge className={statusColors[op.status]} variant="secondary">
+                          {statusLabels[op.status] || op.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Operations Tab */}
           <TabsContent value="operations" className="space-y-4">
+            {/* Filters */}
             <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <List className="h-5 w-5" />
-                      Gestión de Operaciones
-                    </CardTitle>
-                    <CardDescription>
-                      {operationsTotal} operaciones encontradas
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
+              <CardContent className="pt-4">
+                <div className="grid gap-4 md:grid-cols-6">
+                  <div className="md:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Buscar</Label>
                     <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Buscar..."
-                        className="pl-8 w-48"
+                        placeholder="ID, email, nombre..."
+                        className="pl-9"
                         value={operationsFilter.search}
                         onChange={(e) => {
-                          setOperationsFilter({...operationsFilter, search: e.target.value})
+                          setOperationsFilter(prev => ({ ...prev, search: e.target.value }))
                           setOperationsPage(0)
                         }}
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Estado</Label>
                     <Select
                       value={operationsFilter.status}
-                      onValueChange={(v) => {
-                        setOperationsFilter({...operationsFilter, status: v})
+                      onValueChange={(value) => {
+                        setOperationsFilter(prev => ({ ...prev, status: value }))
                         setOperationsPage(0)
                       }}
                     >
-                      <SelectTrigger className="w-36">
-                        <SelectValue placeholder="Estado" />
+                      <SelectTrigger>
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -658,15 +777,18 @@ export default function AdminDashboard() {
                         <SelectItem value="cancelled">Cancelada</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Tipo</Label>
                     <Select
                       value={operationsFilter.mode}
-                      onValueChange={(v) => {
-                        setOperationsFilter({...operationsFilter, mode: v})
+                      onValueChange={(value) => {
+                        setOperationsFilter(prev => ({ ...prev, mode: value }))
                         setOperationsPage(0)
                       }}
                     >
-                      <SelectTrigger className="w-36">
-                        <SelectValue placeholder="Modo" />
+                      <SelectTrigger>
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -677,226 +799,428 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Desde</Label>
+                    <Input
+                      type="date"
+                      value={operationsFilter.dateFrom}
+                      onChange={(e) => {
+                        setOperationsFilter(prev => ({ ...prev, dateFrom: e.target.value }))
+                        setOperationsPage(0)
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Hasta</Label>
+                    <Input
+                      type="date"
+                      value={operationsFilter.dateTo}
+                      onChange={(e) => {
+                        setOperationsFilter(prev => ({ ...prev, dateTo: e.target.value }))
+                        setOperationsPage(0)
+                      }}
+                    />
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {operationsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-                    Cargando...
-                  </div>
-                ) : operations.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No se encontraron operaciones
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {operations.map((op) => (
-                      <div
-                        key={op.id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <Badge className={statusColors[op.status]}>{statusLabels[op.status]}</Badge>
-                              <Badge variant="outline">{modeLabels[op.mode]}</Badge>
-                            </div>
-                            <p className="text-sm font-medium">{op.operation_number}</p>
-                            <p className="text-xs text-muted-foreground">{op.user_email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-sm font-medium">
-                              {formatCurrency(op.source_amount)} {op.source_currency}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              → {formatCurrency(op.destination_amount)} {op.destination_currency}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{formatDate(op.created_at)}</p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fetchOperationDetail(op.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              </CardContent>
+            </Card>
 
+            {/* Operations Table */}
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">ID</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Fecha</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Usuario</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Par</th>
+                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Envía</th>
+                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Recibe</th>
+                        <th className="text-center p-3 text-xs font-medium text-muted-foreground">Estado</th>
+                        <th className="text-center p-3 text-xs font-medium text-muted-foreground">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {operationsLoading ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center">
+                            <RefreshCw className="h-5 w-5 animate-spin mx-auto text-primary" />
+                          </td>
+                        </tr>
+                      ) : operations.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                            No se encontraron operaciones
+                          </td>
+                        </tr>
+                      ) : (
+                        operations.map((op) => (
+                          <tr key={op.id} className="hover:bg-muted/30">
+                            <td className="p-3">
+                              <span className="font-mono text-xs">{op.operation_number}</span>
+                            </td>
+                            <td className="p-3 text-xs text-muted-foreground">
+                              {formatDateShort(op.created_at)}
+                            </td>
+                            <td className="p-3">
+                              <div>
+                                <p className="text-sm font-medium truncate max-w-[150px]">{op.user_full_name}</p>
+                                <p className="text-xs text-muted-foreground truncate max-w-[150px]">{op.user_email}</p>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1 text-xs">
+                                <span>{currencyFlags[op.source_currency] || ""}</span>
+                                <span>{op.source_currency}</span>
+                                <ArrowRight className="h-3 w-3" />
+                                <span>{currencyFlags[op.destination_currency] || ""}</span>
+                                <span>{op.destination_currency}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-mono text-sm">
+                              {formatCurrency(op.source_amount)} {op.source_currency}
+                            </td>
+                            <td className="p-3 text-right font-mono text-sm">
+                              {formatCurrency(op.destination_amount)} {op.destination_currency}
+                            </td>
+                            <td className="p-3 text-center">
+                              <Badge className={statusColors[op.status]} variant="secondary">
+                                {statusLabels[op.status] || op.status}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => fetchOperationDetail(op.id)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                
                 {/* Pagination */}
-                {operationsTotal > 20 && (
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground">
-                      Mostrando {operationsPage * 20 + 1} - {Math.min((operationsPage + 1) * 20, operationsTotal)} de {operationsTotal}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={operationsPage === 0}
-                        onClick={() => setOperationsPage(p => p - 1)}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={(operationsPage + 1) * 20 >= operationsTotal}
-                        onClick={() => setOperationsPage(p => p + 1)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                <div className="flex items-center justify-between p-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Mostrando {operationsPage * 20 + 1}-{Math.min((operationsPage + 1) * 20, operationsTotal)} de {operationsTotal}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={operationsPage === 0}
+                      onClick={() => setOperationsPage(p => p - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={(operationsPage + 1) * 20 >= operationsTotal}
+                      onClick={() => setOperationsPage(p => p + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
 
             {/* Operation Detail Modal */}
             {selectedOperation && (
               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>{selectedOperation.operation_number}</CardTitle>
-                        <CardDescription>Detalle de operación</CardDescription>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedOperation(null)}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <CardHeader className="flex flex-row items-start justify-between sticky top-0 bg-background z-10">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        Operación {selectedOperation.operation_number}
+                        <Badge className={statusColors[selectedOperation.status]} variant="secondary">
+                          {statusLabels[selectedOperation.status]}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        Creada el {formatDate(selectedOperation.created_at)}
+                      </CardDescription>
                     </div>
+                    <Button variant="ghost" size="icon" onClick={() => setSelectedOperation(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Badge className={statusColors[selectedOperation.status]}>
-                        {statusLabels[selectedOperation.status]}
-                      </Badge>
-                      <Badge variant="outline">{modeLabels[selectedOperation.mode]}</Badge>
-                      <Badge variant="outline">{selectedOperation.currency_pair?.replace("_", " / ")}</Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-muted-foreground">Monto Origen</Label>
-                        <p className="font-semibold">
-                          {formatCurrency(selectedOperation.source_amount)} {selectedOperation.source_currency}
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Monto Destino</Label>
-                        <p className="font-semibold">
-                          {formatCurrency(selectedOperation.destination_amount)} {selectedOperation.destination_currency}
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Tasa</Label>
-                        <p className="font-semibold">{selectedOperation.exchange_rate}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Comisión</Label>
-                        <p className="font-semibold">{(selectedOperation.fee_percentage * 100).toFixed(2)}%</p>
+                  <CardContent className="space-y-6">
+                    {/* Operation Summary */}
+                    <div className="p-4 bg-primary/5 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold">{formatCurrency(selectedOperation.source_amount)}</p>
+                          <p className="text-sm text-muted-foreground">{selectedOperation.source_currency}</p>
+                        </div>
+                        <div className="flex flex-col items-center">
+                          <ArrowRight className="h-6 w-6 text-primary" />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Tasa: {selectedOperation.exchange_rate} | Comisión: {(selectedOperation.fee_percentage * 100).toFixed(2)}%
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold">{formatCurrency(selectedOperation.destination_amount)}</p>
+                          <p className="text-sm text-muted-foreground">{selectedOperation.destination_currency}</p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="border-t pt-4">
-                      <Label className="text-muted-foreground">Usuario</Label>
-                      <p className="font-semibold">{selectedOperation.user_full_name || "N/A"}</p>
-                      <p className="text-sm text-muted-foreground">{selectedOperation.user_email}</p>
+                    {/* User Info */}
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Datos del Cliente
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Nombre</p>
+                          <p className="font-medium">{selectedOperation.user_full_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Email</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{selectedOperation.user_email}</p>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => copyToClipboard(selectedOperation.user_email, "email")}
+                            >
+                              {copiedField === "email" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                        </div>
+                        {selectedOperation.user_phone && (
+                          <div>
+                            <p className="text-muted-foreground">Teléfono</p>
+                            <p className="font-medium">{selectedOperation.user_phone}</p>
+                          </div>
+                        )}
+                        {selectedOperation.user_document_number && (
+                          <div>
+                            <p className="text-muted-foreground">Documento</p>
+                            <p className="font-medium">{selectedOperation.user_document_type} {selectedOperation.user_document_number}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
+                    {/* Beneficiary Info */}
                     {selectedOperation.beneficiary_full_name && (
-                      <div className="border-t pt-4">
-                        <Label className="text-muted-foreground">Beneficiario</Label>
-                        <p className="font-semibold">{selectedOperation.beneficiary_full_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedOperation.beneficiary_phone} - {selectedOperation.beneficiary_bank_name}
-                        </p>
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <Download className="h-4 w-4" />
+                          Datos del Beneficiario
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Nombre</p>
+                            <p className="font-medium">{selectedOperation.beneficiary_full_name}</p>
+                          </div>
+                          {selectedOperation.beneficiary_phone && (
+                            <div>
+                              <p className="text-muted-foreground">Teléfono</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{selectedOperation.beneficiary_phone}</p>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => copyToClipboard(selectedOperation.beneficiary_phone || "", "phone")}
+                                >
+                                  {copiedField === "phone" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          {selectedOperation.beneficiary_bank_name && (
+                            <div>
+                              <p className="text-muted-foreground">Banco</p>
+                              <p className="font-medium">{selectedOperation.beneficiary_bank_name}</p>
+                            </div>
+                          )}
+                          {selectedOperation.beneficiary_account_number && (
+                            <div>
+                              <p className="text-muted-foreground">Cuenta</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium font-mono">{selectedOperation.beneficiary_account_number}</p>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => copyToClipboard(selectedOperation.beneficiary_account_number || "", "account")}
+                                >
+                                  {copiedField === "account" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          {selectedOperation.beneficiary_document_number && (
+                            <div>
+                              <p className="text-muted-foreground">Documento</p>
+                              <p className="font-medium">{selectedOperation.beneficiary_document_type} {selectedOperation.beneficiary_document_number}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
-                    {/* Actions */}
-                    <div className="border-t pt-4 flex flex-wrap gap-2">
-                      {selectedOperation.status === "pending" && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleOperationAction("approve")}
-                            disabled={actionLoading}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            Aprobar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleOperationAction("cancel")}
-                            disabled={actionLoading}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        </>
-                      )}
-                      {selectedOperation.status === "processing" && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            onClick={() => handleOperationAction("complete")}
-                            disabled={actionLoading}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Completar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleOperationAction("cancel")}
-                            disabled={actionLoading}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        </>
-                      )}
-                      {selectedOperation.status === "cancelled" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOperationAction("revive")}
-                          disabled={actionLoading}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Revivir
-                        </Button>
-                      )}
+                    {/* Wallet Info */}
+                    {selectedOperation.wallet_address && (
+                      <div>
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <Wallet className="h-4 w-4" />
+                          Datos de Wallet
+                        </h4>
+                        <div className="text-sm space-y-2">
+                          <div>
+                            <p className="text-muted-foreground">Dirección</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium font-mono text-xs break-all">{selectedOperation.wallet_address}</p>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() => copyToClipboard(selectedOperation.wallet_address || "", "wallet")}
+                              >
+                                {copiedField === "wallet" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {selectedOperation.wallet_network && (
+                            <div>
+                              <p className="text-muted-foreground">Red</p>
+                              <p className="font-medium">{selectedOperation.wallet_network}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment Reference */}
+                    {selectedOperation.payment_reference && (
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                        <p className="text-sm text-muted-foreground">Referencia de Pago</p>
+                        <p className="font-mono font-medium">{selectedOperation.payment_reference}</p>
+                      </div>
+                    )}
+
+                    {/* Timeline */}
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Historial
+                      </h4>
+                      <div className="space-y-3">
+                        {operationLogs.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Sin cambios registrados</p>
+                        ) : (
+                          operationLogs.map((log) => (
+                            <div key={log.id} className="flex gap-3 text-sm">
+                              <div className="w-2 h-2 mt-2 rounded-full bg-primary shrink-0" />
+                              <div>
+                                <p>
+                                  <span className="font-medium">{statusLabels[log.previous_status]}</span>
+                                  {" → "}
+                                  <span className="font-medium">{statusLabels[log.new_status]}</span>
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(log.created_at)} por {log.changed_by}
+                                </p>
+                                {log.notes && (
+                                  <p className="text-xs text-muted-foreground mt-1 italic">"{log.notes}"</p>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
 
-                    {/* Logs */}
-                    {operationLogs.length > 0 && (
+                    {/* Actions */}
+                    {selectedOperation.status !== "completed" && selectedOperation.status !== "cancelled" && (
                       <div className="border-t pt-4">
-                        <Label className="text-muted-foreground mb-2 block">Historial</Label>
-                        <div className="space-y-2">
-                          {operationLogs.map((log) => (
-                            <div key={log.id} className="text-sm p-2 rounded bg-muted/50">
-                              <p>
-                                <span className="font-medium">{log.previous_status || "nuevo"}</span>
-                                {" → "}
-                                <span className="font-medium">{log.new_status}</span>
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {log.changed_by} - {formatDate(log.created_at)}
-                              </p>
-                              {log.notes && <p className="text-xs mt-1">{log.notes}</p>}
-                            </div>
-                          ))}
+                        <h4 className="font-semibold mb-3">Acciones</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <Label>Notas (opcional)</Label>
+                            <Input
+                              placeholder="Agregar nota a la acción..."
+                              value={actionNotes}
+                              onChange={(e) => setActionNotes(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedOperation.status === "pending" && (
+                              <Button
+                                onClick={() => handleOperationAction("approve")}
+                                disabled={actionLoading}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Aprobar
+                              </Button>
+                            )}
+                            {selectedOperation.status === "awaiting_payment" && (
+                              <Button
+                                onClick={() => handleOperationAction("confirm_payment")}
+                                disabled={actionLoading}
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Confirmar Pago
+                              </Button>
+                            )}
+                            {selectedOperation.status === "processing" && (
+                              <Button
+                                onClick={() => handleOperationAction("complete")}
+                                disabled={actionLoading}
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Completar
+                              </Button>
+                            )}
+                            <Button
+                              variant="destructive"
+                              onClick={() => handleOperationAction("cancel")}
+                              disabled={actionLoading}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Revive Action */}
+                    {selectedOperation.status === "cancelled" && (
+                      <div className="border-t pt-4">
+                        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                          <AlertTriangle className="h-5 w-5 text-amber-600" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Operación Cancelada</p>
+                            <p className="text-xs text-muted-foreground">Puedes reactivar esta operación si fue cancelada por error</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOperationAction("revive")}
+                            disabled={actionLoading}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Revivir
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -907,144 +1231,471 @@ export default function AdminDashboard() {
           </TabsContent>
 
           {/* Rates Tab */}
-          <TabsContent value="rates" className="space-y-4">
+          <TabsContent value="rates" className="space-y-6">
+            {/* Main Rates */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Gestión de Tasas de Cambio
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Pares Principales
                 </CardTitle>
-                <CardDescription>
-                  Administra las tasas de cambio para todos los pares
-                </CardDescription>
+                <CardDescription>USD/VES y VES/USDT - Los pares más importantes</CardDescription>
               </CardHeader>
               <CardContent>
                 {ratesLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-                    Cargando...
+                    <RefreshCw className="h-5 w-5 animate-spin text-primary" />
                   </div>
-                ) : rates.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No hay tasas configuradas
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {mainRates.map((rate) => {
+                      const preview = calculatePreview(rate)
+                      const isEditing = editingRate === rate.id
+                      return (
+                        <Card key={rate.id} className={`border-2 ${rate.is_active ? "border-primary/20" : "border-red-200 bg-red-50/50"}`}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{currencyFlags[rate.source_currency]}</span>
+                                <span className="font-bold">{rate.source_currency}</span>
+                                <ArrowRight className="h-4 w-4" />
+                                <span className="text-2xl">{currencyFlags[rate.destination_currency]}</span>
+                                <span className="font-bold">{rate.destination_currency}</span>
+                              </div>
+                              <Badge variant={rate.is_active ? "default" : "secondary"}>
+                                {rate.is_active ? "Activo" : "Inactivo"}
+                              </Badge>
+                            </div>
+
+                            {isEditing ? (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-xs">Tasa</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.0001"
+                                      value={editRateValues.rate}
+                                      onChange={(e) => setEditRateValues(prev => ({ ...prev, rate: e.target.value }))}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Comisión %</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editRateValues.fee}
+                                      onChange={(e) => setEditRateValues(prev => ({ ...prev, fee: e.target.value }))}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Mín</Label>
+                                    <Input
+                                      type="number"
+                                      value={editRateValues.min}
+                                      onChange={(e) => setEditRateValues(prev => ({ ...prev, min: e.target.value }))}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Máx</Label>
+                                    <Input
+                                      type="number"
+                                      value={editRateValues.max}
+                                      onChange={(e) => setEditRateValues(prev => ({ ...prev, max: e.target.value }))}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => handleUpdateRate(rate.id)} disabled={actionLoading}>
+                                    <Save className="h-4 w-4 mr-1" />
+                                    Guardar
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => setEditingRate(null)}>
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Tasa</p>
+                                    <p className="text-xl font-bold">{formatCurrency(rate.rate, 4)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Comisión</p>
+                                    <p className="text-xl font-bold">{(rate.fee_percentage * 100).toFixed(2)}%</p>
+                                  </div>
+                                </div>
+                                <div className="p-3 bg-muted/50 rounded-lg mb-4">
+                                  <p className="text-xs text-muted-foreground mb-1">Preview en calculadora</p>
+                                  <p className="text-sm">
+                                    {preview.send} {rate.source_currency} → <strong>{formatCurrency(preview.receive)}</strong> {rate.destination_currency}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingRate(rate.id)
+                                      setEditRateValues({
+                                        rate: rate.rate.toString(),
+                                        fee: (rate.fee_percentage * 100).toString(),
+                                        min: rate.min_amount.toString(),
+                                        max: rate.max_amount.toString(),
+                                      })
+                                    }}
+                                  >
+                                    <Edit2 className="h-4 w-4 mr-1" />
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={rate.is_active ? "destructive" : "default"}
+                                    onClick={() => handleToggleRateActive(rate)}
+                                  >
+                                    <Power className="h-4 w-4 mr-1" />
+                                    {rate.is_active ? "Desactivar" : "Activar"}
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Other Rates */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Otros Pares de Divisas</CardTitle>
+                  <CardDescription>{otherRates.length} pares configurados</CardDescription>
+                </div>
+                <Button onClick={() => setShowNewRateForm(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Par
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {ratesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-5 w-5 animate-spin text-primary" />
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {rates.map((rate) => (
-                      <div
-                        key={rate.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${!rate.is_active ? "opacity-50 bg-muted/30" : ""}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <p className="font-semibold">{rate.currency_pair.replace("_", " / ")}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {rate.provider || "Manual"} - Actualizado: {formatDate(rate.updated_at)}
-                            </p>
+                    {otherRates.map((rate) => {
+                      const isEditing = editingRate === rate.id
+                      return (
+                        <div
+                          key={rate.id}
+                          className={`flex items-center gap-4 p-3 rounded-lg border ${
+                            rate.is_active ? "bg-background" : "bg-red-50/50 border-red-200"
+                          }`}
+                        >
+                          <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                          <div className="flex items-center gap-2 min-w-[120px]">
+                            <span>{currencyFlags[rate.source_currency]}</span>
+                            <span className="font-medium">{rate.source_currency}</span>
+                            <ArrowRight className="h-3 w-3" />
+                            <span>{currencyFlags[rate.destination_currency]}</span>
+                            <span className="font-medium">{rate.destination_currency}</span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {editingRate === rate.id ? (
-                            <div className="flex items-center gap-2">
+
+                          {isEditing ? (
+                            <div className="flex-1 flex items-center gap-2">
                               <Input
                                 type="number"
                                 step="0.0001"
-                                className="w-28"
                                 value={editRateValues.rate}
-                                onChange={(e) => setEditRateValues({...editRateValues, rate: e.target.value})}
+                                onChange={(e) => setEditRateValues(prev => ({ ...prev, rate: e.target.value }))}
+                                className="w-28"
                                 placeholder="Tasa"
                               />
                               <Input
                                 type="number"
                                 step="0.01"
-                                className="w-20"
                                 value={editRateValues.fee}
-                                onChange={(e) => setEditRateValues({...editRateValues, fee: e.target.value})}
-                                placeholder="Fee %"
+                                onChange={(e) => setEditRateValues(prev => ({ ...prev, fee: e.target.value }))}
+                                className="w-20"
+                                placeholder="% Com"
                               />
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateRate(rate.id)}
-                                disabled={actionLoading}
-                              >
+                              <Button size="sm" onClick={() => handleUpdateRate(rate.id)} disabled={actionLoading}>
                                 <Save className="h-4 w-4" />
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingRate(null)}
-                              >
+                              <Button size="sm" variant="outline" onClick={() => setEditingRate(null)}>
                                 <X className="h-4 w-4" />
                               </Button>
                             </div>
                           ) : (
                             <>
-                              <div className="text-right">
-                                <p className="font-semibold">{rate.rate}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Fee: {(rate.fee_percentage * 100).toFixed(2)}%
-                                </p>
+                              <div className="flex-1 flex items-center gap-6">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Tasa</p>
+                                  <p className="font-mono font-medium">{formatCurrency(rate.rate, 4)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Comisión</p>
+                                  <p className="font-medium">{(rate.fee_percentage * 100).toFixed(2)}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Rango</p>
+                                  <p className="text-sm">{formatCurrency(rate.min_amount, 0)} - {formatCurrency(rate.max_amount, 0)}</p>
+                                </div>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Button
-                                  size="sm"
-                                  variant="outline"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8"
                                   onClick={() => {
                                     setEditingRate(rate.id)
                                     setEditRateValues({
-                                      rate: String(rate.rate),
-                                      fee: String(rate.fee_percentage),
+                                      rate: rate.rate.toString(),
+                                      fee: (rate.fee_percentage * 100).toString(),
+                                      min: rate.min_amount.toString(),
+                                      max: rate.max_amount.toString(),
                                     })
                                   }}
                                 >
                                   <Edit2 className="h-4 w-4" />
                                 </Button>
                                 <Button
-                                  size="sm"
-                                  variant={rate.is_active ? "ghost" : "default"}
+                                  size="icon"
+                                  variant="ghost"
+                                  className={`h-8 w-8 ${rate.is_active ? "text-emerald-600" : "text-red-600"}`}
                                   onClick={() => handleToggleRateActive(rate)}
                                 >
-                                  {rate.is_active ? "Desactivar" : "Activar"}
+                                  <Power className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-red-600"
+                                  onClick={() => handleDeleteRate(rate.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* New Rate Modal */}
+            {showNewRateForm && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <Card className="w-full max-w-md">
+                  <CardHeader>
+                    <CardTitle>Agregar Nuevo Par</CardTitle>
+                    <CardDescription>Configura un nuevo par de divisas</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Moneda Origen</Label>
+                        <Select
+                          value={newRate.sourceCurrency}
+                          onValueChange={(v) => setNewRate(prev => ({ ...prev, sourceCurrency: v }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["USD", "EUR", "VES", "COP", "MXN", "ARS", "BRL", "CLP", "PEN", "USDT"].map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {currencyFlags[c]} {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Moneda Destino</Label>
+                        <Select
+                          value={newRate.destinationCurrency}
+                          onValueChange={(v) => setNewRate(prev => ({ ...prev, destinationCurrency: v }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["USD", "EUR", "VES", "COP", "MXN", "ARS", "BRL", "CLP", "PEN", "USDT"].map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {currencyFlags[c]} {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Tasa de Cambio</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        placeholder="Ej: 36.50"
+                        value={newRate.rate}
+                        onChange={(e) => setNewRate(prev => ({ ...prev, rate: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label>Comisión %</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={newRate.feePercentage}
+                          onChange={(e) => setNewRate(prev => ({ ...prev, feePercentage: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Mínimo</Label>
+                        <Input
+                          type="number"
+                          value={newRate.minAmount}
+                          onChange={(e) => setNewRate(prev => ({ ...prev, minAmount: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Máximo</Label>
+                        <Input
+                          type="number"
+                          value={newRate.maxAmount}
+                          onChange={(e) => setNewRate(prev => ({ ...prev, maxAmount: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button className="flex-1" onClick={handleCreateRate} disabled={actionLoading}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crear Par
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowNewRateForm(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           {/* Settings Tab */}
-          <TabsContent value="settings">
+          <TabsContent value="settings" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Change Password */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Cambiar Contraseña</CardTitle>
+                  <CardDescription>Actualiza tu contraseña de acceso</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Nueva Contraseña</Label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div>
+                    <Label>Confirmar Contraseña</Label>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={!newPassword || newPassword !== confirmPassword}
+                    onClick={() => {
+                      alert("Funcionalidad pendiente de implementar")
+                      setNewPassword("")
+                      setConfirmPassword("")
+                    }}
+                  >
+                    Actualizar Contraseña
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Create Admin */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Crear Nuevo Admin</CardTitle>
+                  <CardDescription>Agrega un nuevo administrador al sistema</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value)}
+                      placeholder="admin@ejemplo.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>Contraseña</Label>
+                    <Input
+                      type="password"
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={!newAdminEmail || !newAdminPassword}
+                    onClick={() => {
+                      alert("Funcionalidad pendiente de implementar")
+                      setNewAdminEmail("")
+                      setNewAdminPassword("")
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Admin
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* System Info */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Configuración
-                </CardTitle>
+                <CardTitle>Información del Sistema</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
-                    <p className="font-medium">Administrador actual</p>
-                    <p className="text-sm text-muted-foreground">{adminEmail}</p>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Pares Activos</p>
+                    <p className="text-2xl font-bold">{rates.filter(r => r.is_active).length}</p>
                   </div>
-                  <Badge variant="outline">Activo</Badge>
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
-                    <p className="font-medium">Tasas activas</p>
-                    <p className="text-sm text-muted-foreground">
-                      {rates.filter(r => r.is_active).length} de {rates.length} pares
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Total Usuarios</p>
+                    <p className="text-2xl font-bold">{stats?.totalUsers || 0}</p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Operaciones Hoy</p>
+                    <p className="text-2xl font-bold">
+                      {(stats?.byStatus.completedToday || 0) + (stats?.byStatus.cancelledToday || 0)}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setActiveTab("rates")}>
-                    Gestionar
-                  </Button>
                 </div>
               </CardContent>
             </Card>
