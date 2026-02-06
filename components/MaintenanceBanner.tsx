@@ -121,7 +121,7 @@ export default function MaintenanceBanner({ onClose }: MaintenanceBannerProps) {
             <p className="text-gray-600 text-sm">
               También puedes contactarnos por{" "}
               <a
-                href="https://wa.me/12138245415"
+                href="https://wa.me/56956413113"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-green-600 hover:text-green-700 font-medium"

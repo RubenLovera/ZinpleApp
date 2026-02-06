@@ -98,7 +98,7 @@ export function getWelcomeEmailTemplate(userName: string, userEmail: string) {
         </div>
 
         <div class="footer">
-          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/12138245415" style="color: #5B38B5;">+1 213 824 5415</a></p>
+          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/56956413113" style="color: #5B38B5;">+56 9 5641 3113</a></p>
           <p>© 2024 ZinpleApp. Todos los derechos reservados.</p>
         </div>
       </div>
@@ -189,7 +189,7 @@ export function getOperationCreatedEmailTemplate(
           </div>
 
           <div style="text-align: center;">
-            <a href="https://wa.me/12138245415?text=Hola!%20Tengo%20el%20comprobante%20de%20la%20operación%20${operationId}" class="button">📱 Enviar Comprobante por WhatsApp</a>
+            <a href="https://wa.me/56956413113?text=Hola!%20Tengo%20el%20comprobante%20de%20la%20operación%20${operationId}" class="button">📱 Enviar Comprobante por WhatsApp</a>
           </div>
 
           <div class="warning">
@@ -203,7 +203,7 @@ export function getOperationCreatedEmailTemplate(
         </div>
 
         <div class="footer">
-          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/12138245415" style="color: #5B38B5;">+1 213 824 5415</a></p>
+          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/56956413113" style="color: #5B38B5;">+56 9 5641 3113</a></p>
           <p>© 2024 ZinpleApp. Todos los derechos reservados.</p>
         </div>
       </div>
@@ -301,7 +301,7 @@ export function getOperationCompletedEmailTemplate(
 
         <div class="footer">
           <p>Gracias por confiar en ZinpleApp 💜</p>
-          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/12138245415" style="color: #5B38B5;">+1 213 824 5415</a></p>
+          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/56956413113" style="color: #5B38B5;">+56 9 5641 3113</a></p>
           <p>© 2024 ZinpleApp. Todos los derechos reservados.</p>
         </div>
       </div>
@@ -400,7 +400,7 @@ export function getOperationCancelledEmailTemplate(
         </div>
 
         <div class="footer">
-          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/12138245415" style="color: #5B38B5;">+1 213 824 5415</a></p>
+          <p>¿Necesitas ayuda? Contáctanos por WhatsApp: <a href="https://wa.me/56956413113" style="color: #5B38B5;">+56 9 5641 3113</a></p>
           <p>© 2024 ZinpleApp. Todos los derechos reservados.</p>
         </div>
       </div>
