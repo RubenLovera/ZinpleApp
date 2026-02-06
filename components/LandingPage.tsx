@@ -28,13 +28,13 @@ export default function LandingPage() {
 
   const handleWhatsAppContact = () => {
     const message = `Hola! Vengo de la web de Zinple y necesito ayuda con una operación`
-    const whatsappUrl = `https://wa.me/12138245415?text=${encodeURIComponent(message)}`
+    const whatsappUrl = `https://wa.me/56956413113?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
   }
 
   const handleBusinessWhatsAppContact = () => {
     const message = `Hola! Soy un negocio y quiero comenzar a usar Zinple para cobrar y pagar internacionalmente`
-    const whatsappUrl = `https://wa.me/12138245415?text=${encodeURIComponent(message)}`
+    const whatsappUrl = `https://wa.me/56956413113?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
   }
 
@@ -409,7 +409,7 @@ export default function LandingPage() {
             <div className="text-center p-6 rounded-xl bg-muted/50">
               <Phone className="w-8 h-8 mx-auto mb-4 text-primary" />
               <h3 className="font-semibold text-foreground mb-2">WhatsApp</h3>
-              <p className="text-muted-foreground">+1 213 824 5415</p>
+              <p className="text-muted-foreground">+56 9 5641 3113</p>
             </div>
 
             <div className="text-center p-6 rounded-xl bg-muted/50">

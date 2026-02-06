@@ -130,7 +130,7 @@ Cédula: ${user.pagomovil?.cedula}
 Por favor indíquenme la wallet donde debo enviar los USDT.`
     }
 
-    const whatsappUrl = `https://wa.me/12138245415?text=${encodeURIComponent(message)}`
+    const whatsappUrl = `https://wa.me/56956413113?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
   }
 
