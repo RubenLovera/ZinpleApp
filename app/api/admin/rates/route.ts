@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseServer
       .from("exchange_rates")
       .select("*")
-      .order("currency_pair", { ascending: true })
+      .order("display_order", { ascending: true })
 
     if (activeOnly) {
       query = query.eq("is_active", true)
@@ -194,6 +194,65 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, rate: updatedRate })
   } catch (error) {
     console.error("Error in PATCH /api/admin/rates:", error)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+  }
+}
+
+// PUT: Reordenar tasas (drag & drop)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { updates, adminEmail } = body
+
+    if (!updates || !Array.isArray(updates) || !adminEmail) {
+      return NextResponse.json(
+        { error: "Faltan campos requeridos: updates (array), adminEmail" },
+        { status: 400 }
+      )
+    }
+
+    // Actualizar display_order para cada tasa
+    const updatePromises = updates.map((update: { id: string; display_order: number }) =>
+      supabaseServer
+        .from("exchange_rates")
+        .update({
+          display_order: update.display_order,
+          updated_at: new Date().toISOString(),
+          updated_by: adminEmail,
+        })
+        .eq("id", update.id)
+        .select()
+        .single()
+    )
+
+    const results = await Promise.all(updatePromises)
+
+    // Verificar errores
+    const errors = results.filter((r) => r.error)
+    if (errors.length > 0) {
+      console.error("Error updating rates order:", errors)
+      return NextResponse.json(
+        { error: "Error al actualizar el orden de tasas" },
+        { status: 500 }
+      )
+    }
+
+    // Registrar en admin_action_logs
+    await supabaseServer.from("admin_action_logs").insert({
+      admin_email: adminEmail,
+      action_type: "reorder_rates",
+      target_table: "exchange_rates",
+      new_values: { updates },
+      notes: "Reordenamiento de tasas mediante drag & drop",
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: "Tasas reordenadas correctamente",
+      rates: results.map((r) => r.data),
+    })
+  } catch (error) {
+    console.error("Error in PUT /api/admin/rates:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }

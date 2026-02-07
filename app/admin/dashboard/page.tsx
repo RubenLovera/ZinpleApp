@@ -4,6 +4,18 @@ import React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -45,6 +57,7 @@ import {
   Edit2,
   Save,
   X,
+  GripVertical,
 } from "lucide-react"
 
 interface Stats {
@@ -148,6 +161,127 @@ const modeIcons: Record<string, React.ReactNode> = {
   sell_usdt: <DollarSign className="h-4 w-4" />,
 }
 
+// Componente para fila sorteable de tasa
+function RateRow({
+  rate,
+  editingRate,
+  editRateValues,
+  actionLoading,
+  onEdit,
+  onSave,
+  onCancel,
+  onToggle,
+  onEditChange,
+}: {
+  rate: any
+  editingRate: string | null
+  editRateValues: { rate: string; fee: string }
+  actionLoading: boolean
+  onEdit: () => void
+  onSave: () => void
+  onCancel: () => void
+  onToggle: () => void
+  onEditChange: (values: { rate: string; fee: string }) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: rate.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded-lg border ${
+        !rate.is_active ? "opacity-50 bg-muted/30" : ""
+      } ${isDragging ? "shadow-lg bg-accent/10" : ""}`}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+        >
+          <GripVertical className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div>
+          <p className="font-semibold">{rate.currency_pair.replace("_", " / ")}</p>
+          <p className="text-xs text-muted-foreground">
+            {rate.provider || "Manual"} - Actualizado: {formatDate(rate.updated_at)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        {editingRate === rate.id ? (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.0001"
+              className="w-28"
+              value={editRateValues.rate}
+              onChange={(e) => onEditChange({ ...editRateValues, rate: e.target.value })}
+              placeholder="Tasa"
+            />
+            <Input
+              type="number"
+              step="0.01"
+              className="w-20"
+              value={editRateValues.fee}
+              onChange={(e) => onEditChange({ ...editRateValues, fee: e.target.value })}
+              placeholder="Fee %"
+            />
+            <Button size="sm" onClick={onSave} disabled={actionLoading}>
+              <Save className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onCancel}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="text-right">
+              <p className="font-semibold">{rate.rate}</p>
+              <p className="text-xs text-muted-foreground">
+                Fee: {(rate.fee_percentage * 100).toFixed(2)}%
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onEdit}
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant={rate.is_active ? "ghost" : "default"}
+                onClick={onToggle}
+              >
+                {rate.is_active ? "Desactivar" : "Activar"}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
@@ -174,6 +308,17 @@ export default function AdminDashboard() {
   const [ratesLoading, setRatesLoading] = useState(false)
   const [editingRate, setEditingRate] = useState<string | null>(null)
   const [editRateValues, setEditRateValues] = useState<{rate: string, fee: string}>({rate: "", fee: ""})
+  const [ratesSortOrder, setRatesSortOrder] = useState<string[]>([])
+
+  // Drag & drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      distance: 8,
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("zinple_admin_auth")
@@ -341,6 +486,43 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleDragEndRates = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = rates.findIndex((r) => r.id === active.id)
+      const newIndex = rates.findIndex((r) => r.id === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newRates = arrayMove(rates, oldIndex, newIndex)
+        setRates(newRates)
+
+        // Guardar el nuevo orden en BD
+        try {
+          const updates = newRates.map((rate, index) => ({
+            id: rate.id,
+            display_order: index + 1,
+          }))
+
+          const response = await fetch("/api/admin/rates", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates, adminEmail }),
+          })
+
+          const data = await response.json()
+          if (!data.success) {
+            console.error("Error updating rates order:", data.error)
+            await fetchRates() // Revert en caso de error
+          }
+        } catch (error) {
+          console.error("Error saving rates order:", error)
+          await fetchRates() // Revert en caso de error
+        }
+      }
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem("zinple_admin_auth")
     localStorage.removeItem("adminEmail")
@@ -352,15 +534,6 @@ export default function AdminDashboard() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("es-CL", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
   }
 
   if (loading && !stats) {
@@ -904,90 +1077,39 @@ export default function AdminDashboard() {
                     No hay tasas configuradas
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {rates.map((rate) => (
-                      <div
-                        key={rate.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${!rate.is_active ? "opacity-50 bg-muted/30" : ""}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <p className="font-semibold">{rate.currency_pair.replace("_", " / ")}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {rate.provider || "Manual"} - Actualizado: {formatDate(rate.updated_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {editingRate === rate.id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                step="0.0001"
-                                className="w-28"
-                                value={editRateValues.rate}
-                                onChange={(e) => setEditRateValues({...editRateValues, rate: e.target.value})}
-                                placeholder="Tasa"
-                              />
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="w-20"
-                                value={editRateValues.fee}
-                                onChange={(e) => setEditRateValues({...editRateValues, fee: e.target.value})}
-                                placeholder="Fee %"
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateRate(rate.id)}
-                                disabled={actionLoading}
-                              >
-                                <Save className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingRate(null)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="text-right">
-                                <p className="font-semibold">{rate.rate}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Fee: {(rate.fee_percentage * 100).toFixed(2)}%
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingRate(rate.id)
-                                    setEditRateValues({
-                                      rate: String(rate.rate),
-                                      fee: String(rate.fee_percentage),
-                                    })
-                                  }}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant={rate.is_active ? "ghost" : "default"}
-                                  onClick={() => handleToggleRateActive(rate)}
-                                >
-                                  {rate.is_active ? "Desactivar" : "Activar"}
-                                </Button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEndRates}
+                  >
+                    <SortableContext
+                      items={rates.map((r) => r.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {rates.map((rate) => (
+                          <RateRow
+                            key={rate.id}
+                            rate={rate}
+                            editingRate={editingRate}
+                            editRateValues={editRateValues}
+                            actionLoading={actionLoading}
+                            onEdit={() => {
+                              setEditingRate(rate.id)
+                              setEditRateValues({
+                                rate: String(rate.rate),
+                                fee: String(rate.fee_percentage),
+                              })
+                            }}
+                            onSave={() => handleUpdateRate(rate.id)}
+                            onCancel={() => setEditingRate(null)}
+                            onToggle={() => handleToggleRateActive(rate)}
+                            onEditChange={setEditRateValues}
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </CardContent>
             </Card>
