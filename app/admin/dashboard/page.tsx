@@ -610,7 +610,7 @@ export default function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Resumen</span>
@@ -623,6 +623,10 @@ export default function AdminDashboard() {
                   {pendingTotal}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="users" onClick={() => router.push("/admin/users")} className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Clientes</span>
             </TabsTrigger>
             <TabsTrigger value="rates" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
