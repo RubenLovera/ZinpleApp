@@ -289,6 +289,17 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [adminEmail, setAdminEmail] = useState("")
 
+  // Date range state
+  const [dateRange, setDateRange] = useState<{ startDate: Date; endDate: Date }>({
+    startDate: (() => {
+      const d = new Date()
+      d.setDate(d.getDate() - 7)
+      return d
+    })(),
+    endDate: new Date(),
+  })
+  const [dateRangeMode, setDateRangeMode] = useState<"today" | "7days" | "30days" | "custom">("7days")
+
   // Operations state
   const [operations, setOperations] = useState<Operation[]>([])
   const [operationsLoading, setOperationsLoading] = useState(false)
@@ -339,10 +350,18 @@ export default function AdminDashboard() {
     }
   }, [activeTab, operationsPage, operationsFilter])
 
+  useEffect(() => {
+    if (activeTab === "overview") {
+      fetchStats()
+    }
+  }, [dateRange])
+
   const fetchStats = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/admin/stats")
+      const startDate = formatDateForAPI(dateRange.startDate)
+      const endDate = formatDateForAPI(dateRange.endDate)
+      const response = await fetch(`/api/admin/stats?startDate=${startDate}&endDate=${endDate}`)
       const data = await response.json()
       if (data.stats) {
         setStats(data.stats)
@@ -486,6 +505,38 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleDateRangeChange = (mode: "today" | "7days" | "30days" | "custom", customStart?: Date, customEnd?: Date) => {
+    setDateRangeMode(mode)
+    const end = new Date()
+    end.setHours(23, 59, 59, 999)
+    let start = new Date()
+    start.setHours(0, 0, 0, 0)
+
+    switch (mode) {
+      case "today":
+        start = new Date()
+        start.setHours(0, 0, 0, 0)
+        break
+      case "7days":
+        start.setDate(start.getDate() - 7)
+        break
+      case "30days":
+        start.setDate(start.getDate() - 30)
+        break
+      case "custom":
+        if (customStart && customEnd) {
+          start = customStart
+          end.setTime(customEnd.getTime())
+        }
+        break
+    }
+    setDateRange({ startDate: start, endDate: end })
+  }
+
+  const formatDateForAPI = (date: Date): string => {
+    return date.toISOString().split("T")[0]
+  }
+
   const handleDragEndRates = async (event: DragEndEvent) => {
     const { active, over } = event
 
@@ -498,26 +549,21 @@ export default function AdminDashboard() {
         setRates(newRates)
 
         // Guardar el nuevo orden en BD
-        try {
-          const updates = newRates.map((rate, index) => ({
-            id: rate.id,
-            display_order: index + 1,
-          }))
+        const updates = newRates.map((rate, index) => ({
+          id: rate.id,
+          display_order: index + 1,
+        }))
 
-          const response = await fetch("/api/admin/rates", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ updates, adminEmail }),
-          })
+        const response = await fetch("/api/admin/rates", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates, adminEmail }),
+        })
 
-          const data = await response.json()
-          if (!data.success) {
-            console.error("Error updating rates order:", data.error)
-            await fetchRates() // Revert en caso de error
-          }
-        } catch (error) {
-          console.error("Error saving rates order:", error)
-          await fetchRates() // Revert en caso de error
+        const data = await response.json()
+        if (!data.success) {
+          console.error("Error updating rates order:", data.error)
+          fetchRates() // Revert en caso de error
         }
       }
     }
@@ -536,20 +582,7 @@ export default function AdminDashboard() {
     }).format(amount)
   }
 
-  if (loading && !stats) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-          <span>Cargando dashboard...</span>
-        </div>
-      </div>
-    )
-  }
-
-  const pendingTotal =
-    (stats?.byStatus.pending || 0) +
-    (stats?.byStatus.in_progress || 0)
+  const pendingTotal = (stats?.byStatus.pending || 0) + (stats?.byStatus.in_progress || 0)
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -803,7 +836,7 @@ export default function AdminDashboard() {
                         className="pl-8 w-48"
                         value={operationsFilter.search}
                         onChange={(e) => {
-                          setOperationsFilter({...operationsFilter, search: e.target.value})
+                          setOperationsFilter({ ...operationsFilter, search: e.target.value })
                           setOperationsPage(0)
                         }}
                       />
@@ -811,7 +844,7 @@ export default function AdminDashboard() {
                     <Select
                       value={operationsFilter.status}
                       onValueChange={(v) => {
-                        setOperationsFilter({...operationsFilter, status: v})
+                        setOperationsFilter({ ...operationsFilter, status: v })
                         setOperationsPage(0)
                       }}
                     >
@@ -822,7 +855,6 @@ export default function AdminDashboard() {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="pending">Pendiente</SelectItem>
                         <SelectItem value="in_progress">En Proceso</SelectItem>
-                        
                         <SelectItem value="completed">Completada</SelectItem>
                         <SelectItem value="cancelled">Cancelada</SelectItem>
                       </SelectContent>
@@ -830,7 +862,7 @@ export default function AdminDashboard() {
                     <Select
                       value={operationsFilter.mode}
                       onValueChange={(v) => {
-                        setOperationsFilter({...operationsFilter, mode: v})
+                        setOperationsFilter({ ...operationsFilter, mode: v })
                         setOperationsPage(0)
                       }}
                     >
@@ -909,7 +941,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={operationsPage === 0}
-                        onClick={() => setOperationsPage(p => p - 1)}
+                        onClick={() => setOperationsPage((p) => p - 1)}
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
@@ -917,7 +949,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={(operationsPage + 1) * 20 >= operationsTotal}
-                        onClick={() => setOperationsPage(p => p + 1)}
+                        onClick={() => setOperationsPage((p) => p + 1)}
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -1136,7 +1168,7 @@ export default function AdminDashboard() {
                   <div>
                     <p className="font-medium">Tasas activas</p>
                     <p className="text-sm text-muted-foreground">
-                      {rates.filter(r => r.is_active).length} de {rates.length} pares
+                      {rates.filter((r) => r.is_active).length} de {rates.length} pares
                     </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setActiveTab("rates")}>
