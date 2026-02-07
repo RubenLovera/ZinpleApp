@@ -582,7 +582,7 @@ export default function AdminDashboard() {
     }).format(amount)
   }
 
-  const pendingTotal = (stats?.byStatus.pending || 0) + (stats?.byStatus.in_progress || 0)
+  const pendingTotal = (stats?.byStatus?.in_progress || 0)
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -636,130 +636,159 @@ export default function AdminDashboard() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Date Range Filter */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={dateRangeMode === "today" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleDateRangeChange("today")}
+              >
+                Hoy
+              </Button>
+              <Button
+                variant={dateRangeMode === "7days" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleDateRangeChange("7days")}
+              >
+                7 días
+              </Button>
+              <Button
+                variant={dateRangeMode === "30days" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleDateRangeChange("30days")}
+              >
+                30 días
+              </Button>
+            </div>
+
+            {/* KPIs with Change Indicators */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="border-l-4 border-l-amber-500">
+              {/* GTV KPI */}
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-                  <Clock className="h-4 w-4 text-amber-500" />
+                  <CardTitle className="text-sm font-medium">Volumen Bruto</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.pending || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    + {stats?.byStatus.in_progress || 0} en proceso
+                  <div className="text-2xl font-bold">
+                    ${stats?.volume?.today ? stats.volume.today.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0"}
+                  </div>
+                  <p className={`text-xs font-semibold ${(stats?.volume?.today || 0) >= (stats?.volume?.yesterday || 0) ? "text-emerald-600" : "text-red-600"}`}>
+                    {(stats?.volume?.today || 0) >= (stats?.volume?.yesterday || 0) ? "↑" : "↓"} {Math.abs(((stats?.volume?.today || 0) - (stats?.volume?.yesterday || 0)) / (stats?.volume?.yesterday || 1) * 100).toFixed(2)}% vs ayer
                   </p>
                 </CardContent>
               </Card>
 
+              {/* TTV KPI */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Transacciones</CardTitle>
+                  <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.rates?.total || 0}</div>
+                  <p className={`text-xs font-semibold ${(stats?.rates?.total || 0) >= (stats?.rates?.previousTotal || 0) ? "text-emerald-600" : "text-red-600"}`}>
+                    {(stats?.rates?.total || 0) >= (stats?.rates?.previousTotal || 0) ? "↑" : "↓"} {Math.abs(((stats?.rates?.total || 0) - (stats?.rates?.previousTotal || 0)) / (stats?.rates?.previousTotal || 1) * 100).toFixed(2)}% vs anterior
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Revenue KPI */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${stats?.kpis?.revenue?.current ? stats.kpis.revenue.current.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "0"}
+                  </div>
+                  <p className={`text-xs font-semibold ${(stats?.kpis?.revenue?.change || 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {(stats?.kpis?.revenue?.change || 0) >= 0 ? "↑" : "↓"} {Math.abs(stats?.kpis?.revenue?.change || 0)}% vs anterior
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Beneficiaries KPI */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Destinatarios</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
+                  <p className="text-xs text-muted-foreground">Únicos en período</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Status Overview */}
+            <div className="grid gap-4 md:grid-cols-3">
               <Card className="border-l-4 border-l-blue-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">En Proceso</CardTitle>
                   <RefreshCw className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.in_progress || 0}</div>
+                  <div className="text-2xl font-bold">{stats?.byStatus?.in_progress || 0}</div>
                   <p className="text-xs text-muted-foreground">Requieren atención</p>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-emerald-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completadas Hoy</CardTitle>
+                  <CardTitle className="text-sm font-medium">Completadas</CardTitle>
                   <CheckCircle className="h-4 w-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.completedToday || 0}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-                    Exitosas
-                  </p>
+                  <div className="text-2xl font-bold">{stats?.byStatus?.completedToday || 0}</div>
+                  <p className="text-xs text-muted-foreground">Hoy</p>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-red-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Canceladas Hoy</CardTitle>
+                  <CardTitle className="text-sm font-medium">Canceladas</CardTitle>
                   <XCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.cancelledToday || 0}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <ArrowDownRight className="h-3 w-3 text-red-500" />
-                    Fallidas
-                  </p>
+                  <div className="text-2xl font-bold">{stats?.byStatus?.cancelledToday || 0}</div>
+                  <p className="text-xs text-muted-foreground">Hoy</p>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                    Volumen Procesado
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Hoy</span>
-                    <span className="font-semibold">${formatCurrency(stats?.volume.today || 0)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Últimos 7 días</span>
-                    <span className="font-semibold">${formatCurrency(stats?.volume.week || 0)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Últimos 30 días</span>
-                    <span className="font-semibold">${formatCurrency(stats?.volume.month || 0)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                    Por Tipo de Operación
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {Object.entries(stats?.byMode || {}).map(([mode, count]) => (
-                    <div key={mode} className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground flex items-center gap-2">
-                        {modeIcons[mode]}
-                        {modeLabels[mode]}
-                      </span>
-                      <span className="font-semibold">{count}</span>
+            {/* Top Currency Pairs Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Pares Más Utilizados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(stats?.topCurrencyPairs || []).map((pair) => (
+                    <div key={pair.pair} className="flex items-center justify-between">
+                      <span className="text-sm">{pair.pair.replace("_", " / ")}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary h-2 rounded-full"
+                            style={{
+                              width: `${((pair.count / (stats?.topCurrencyPairs?.[0]?.count || 1)) * 100) || 0}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold w-8 text-right">{pair.count}</span>
+                      </div>
                     </div>
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    Top Pares de Divisas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {stats?.topCurrencyPairs.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Sin datos aún</p>
-                  )}
-                  {stats?.topCurrencyPairs.map((item, index) => (
-                    <div key={item.pair} className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                        {item.pair.replace("_", " / ")}
-                      </span>
-                      <span className="font-semibold">{item.count}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-
+            {/* Recent Operations */}
             <div className="grid gap-4 lg:grid-cols-3">
               <Card>
                 <CardHeader>
