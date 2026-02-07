@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     // 2. Crear la operación
     const operationData: Record<string, unknown> = {
       mode: requestData.mode,
-      status: "pending",
+      status: "in_progress",
       currency_pair: requestData.currencyPair,
       source_currency: requestData.sourceCurrency,
       destination_currency: requestData.destinationCurrency,
@@ -204,9 +204,9 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from("operation_logs").insert({
       operation_id: operation.id,
       previous_status: null,
-      new_status: "pending",
+      new_status: "in_progress",
       changed_by: "system",
-      notes: "Operación creada",
+      notes: "Operación creada - en proceso automáticamente",
     })
 
     console.log("API: Operation created successfully:", operation.operation_number)

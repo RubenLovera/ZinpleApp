@@ -50,8 +50,7 @@ import {
 interface Stats {
   byStatus: {
     pending: number
-    awaiting_payment: number
-    processing: number
+    in_progress: number
     completedToday: number
     cancelledToday: number
   }
@@ -123,16 +122,14 @@ interface OperationLog {
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  awaiting_payment: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  processing: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  in_progress: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 }
 
 const statusLabels: Record<string, string> = {
   pending: "Pendiente",
-  awaiting_payment: "Esperando Pago",
-  processing: "Procesando",
+  in_progress: "En Proceso",
   completed: "Completada",
   cancelled: "Cancelada",
 }
@@ -379,8 +376,7 @@ export default function AdminDashboard() {
 
   const pendingTotal =
     (stats?.byStatus.pending || 0) +
-    (stats?.byStatus.awaiting_payment || 0) +
-    (stats?.byStatus.processing || 0)
+    (stats?.byStatus.in_progress || 0)
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -443,18 +439,18 @@ export default function AdminDashboard() {
                 <CardContent>
                   <div className="text-2xl font-bold">{stats?.byStatus.pending || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    + {stats?.byStatus.awaiting_payment || 0} esperando pago
+                    + {stats?.byStatus.in_progress || 0} en proceso
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-purple-500">
+              <Card className="border-l-4 border-l-blue-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">En Proceso</CardTitle>
-                  <RefreshCw className="h-4 w-4 text-purple-500" />
+                  <RefreshCw className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.processing || 0}</div>
+                  <div className="text-2xl font-bold">{stats?.byStatus.in_progress || 0}</div>
                   <p className="text-xs text-muted-foreground">Requieren atención</p>
                 </CardContent>
               </Card>
@@ -652,8 +648,8 @@ export default function AdminDashboard() {
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="pending">Pendiente</SelectItem>
-                        <SelectItem value="awaiting_payment">Esperando Pago</SelectItem>
-                        <SelectItem value="processing">Procesando</SelectItem>
+                        <SelectItem value="in_progress">En Proceso</SelectItem>
+                        
                         <SelectItem value="completed">Completada</SelectItem>
                         <SelectItem value="cancelled">Cancelada</SelectItem>
                       </SelectContent>
@@ -823,32 +819,11 @@ export default function AdminDashboard() {
 
                     {/* Actions */}
                     <div className="border-t pt-4 flex flex-wrap gap-2">
-                      {selectedOperation.status === "pending" && (
+                      {selectedOperation.status === "in_progress" && (
                         <>
                           <Button
                             size="sm"
-                            onClick={() => handleOperationAction("approve")}
-                            disabled={actionLoading}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            Aprobar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleOperationAction("cancel")}
-                            disabled={actionLoading}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        </>
-                      )}
-                      {selectedOperation.status === "processing" && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
                             onClick={() => handleOperationAction("complete")}
                             disabled={actionLoading}
                           >
