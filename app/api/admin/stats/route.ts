@@ -3,136 +3,192 @@ import { supabaseServer } from "@/lib/supabase-server"
 
 export async function GET(request: NextRequest) {
   try {
-    // Obtener fecha de hoy
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayISO = today.toISOString()
+    const { searchParams } = new URL(request.url)
+    const startDateParam = searchParams.get("startDate")
+    const endDateParam = searchParams.get("endDate")
 
-    // Fecha de hace 7 días
-    const weekAgo = new Date()
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    weekAgo.setHours(0, 0, 0, 0)
-    const weekAgoISO = weekAgo.toISOString()
+    // Determinar rango de fechas
+    const endDate = endDateParam ? new Date(endDateParam) : new Date()
+    endDate.setHours(23, 59, 59, 999)
 
-    // Fecha de hace 30 días
-    const monthAgo = new Date()
-    monthAgo.setDate(monthAgo.getDate() - 30)
-    monthAgo.setHours(0, 0, 0, 0)
-    const monthAgoISO = monthAgo.toISOString()
+    const startDate = startDateParam
+      ? new Date(startDateParam)
+      : (() => {
+          const d = new Date()
+          d.setDate(d.getDate() - 7) // Por defecto últimos 7 días
+          d.setHours(0, 0, 0, 0)
+          return d
+        })()
+    startDate.setHours(0, 0, 0, 0)
+
+    // Período anterior para comparación (misma duración)
+    const durationMs = endDate.getTime() - startDate.getTime()
+    const prevPeriodEnd = new Date(startDate.getTime() - 1000)
+    const prevPeriodStart = new Date(prevPeriodEnd.getTime() - durationMs)
+
+    const startDateISO = startDate.toISOString()
+    const endDateISO = endDate.toISOString()
+    const prevPeriodStartISO = prevPeriodStart.toISOString()
+    const prevPeriodEndISO = prevPeriodEnd.toISOString()
 
     // ==========================================
-    // Conteos por estado
+    // Conteos por estado (actual)
     // ==========================================
-    const { count: pendingCount } = await supabaseServer
+    const { count: inProgressCount } = await supabaseServer
       .from("operations")
       .select("*", { count: "exact", head: true })
-      .eq("status", "pending")
+      .eq("status", "in_progress")
 
-    const { count: awaitingPaymentCount } = await supabaseServer
-      .from("operations")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "awaiting_payment")
-
-    const { count: processingCount } = await supabaseServer
-      .from("operations")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "processing")
-
-    const { count: completedTodayCount } = await supabaseServer
+    const { count: completedCount } = await supabaseServer
       .from("operations")
       .select("*", { count: "exact", head: true })
       .eq("status", "completed")
-      .gte("completed_at", todayISO)
+      .gte("completed_at", startDateISO)
+      .lte("completed_at", endDateISO)
 
-    const { count: cancelledTodayCount } = await supabaseServer
+    const { count: cancelledCount } = await supabaseServer
       .from("operations")
       .select("*", { count: "exact", head: true })
       .eq("status", "cancelled")
-      .gte("cancelled_at", todayISO)
+      .gte("cancelled_at", startDateISO)
+      .lte("cancelled_at", endDateISO)
 
     // ==========================================
-    // Volumen procesado
+    // Conteos por estado (período anterior)
     // ==========================================
-    const { data: completedTodayData } = await supabaseServer
+    const { count: completedPrevCount } = await supabaseServer
       .from("operations")
-      .select("source_amount, source_currency")
+      .select("*", { count: "exact", head: true })
       .eq("status", "completed")
-      .gte("completed_at", todayISO)
-
-    const { data: completedWeekData } = await supabaseServer
-      .from("operations")
-      .select("source_amount, source_currency")
-      .eq("status", "completed")
-      .gte("completed_at", weekAgoISO)
-
-    const { data: completedMonthData } = await supabaseServer
-      .from("operations")
-      .select("source_amount, source_currency")
-      .eq("status", "completed")
-      .gte("completed_at", monthAgoISO)
-
-    // Calcular volumen (simplificado - suma de source_amount)
-    const volumeToday = completedTodayData?.reduce((sum, op) => sum + (op.source_amount || 0), 0) || 0
-    const volumeWeek = completedWeekData?.reduce((sum, op) => sum + (op.source_amount || 0), 0) || 0
-    const volumeMonth = completedMonthData?.reduce((sum, op) => sum + (op.source_amount || 0), 0) || 0
+      .gte("completed_at", prevPeriodStartISO)
+      .lte("completed_at", prevPeriodEndISO)
 
     // ==========================================
-    // Conteos por modo
+    // Datos por día para gráficos
     // ==========================================
-    const { count: sendCount } = await supabaseServer
+    const { data: operationsByDay } = await supabaseServer
       .from("operations")
-      .select("*", { count: "exact", head: true })
-      .eq("mode", "send")
+      .select(
+        `
+        id,
+        created_at,
+        completed_at,
+        status,
+        source_amount,
+        source_currency,
+        destination_amount,
+        destination_currency,
+        currency_pair,
+        fee_amount,
+        user_email,
+        beneficiary_id
+      `
+      )
+      .gte("created_at", startDateISO)
+      .lte("created_at", endDateISO)
+      .order("created_at", { ascending: true })
 
-    const { count: receiveCount } = await supabaseServer
-      .from("operations")
-      .select("*", { count: "exact", head: true })
-      .eq("mode", "receive")
-
-    const { count: buyUsdtCount } = await supabaseServer
-      .from("operations")
-      .select("*", { count: "exact", head: true })
-      .eq("mode", "buy_usdt")
-
-    const { count: sellUsdtCount } = await supabaseServer
-      .from("operations")
-      .select("*", { count: "exact", head: true })
-      .eq("mode", "sell_usdt")
-
-    // ==========================================
-    // Conteos por par de divisas (top 5)
-    // ==========================================
-    const { data: currencyPairData } = await supabaseServer
-      .from("operations")
-      .select("currency_pair")
-
-    const pairCounts: Record<string, number> = {}
-    currencyPairData?.forEach(op => {
-      if (op.currency_pair) {
-        pairCounts[op.currency_pair] = (pairCounts[op.currency_pair] || 0) + 1
+    // Procesar datos por día
+    const dataByDay: Record<
+      string,
+      {
+        date: string
+        gtv: number
+        ttv: number
+        revenue: number
+        newUsers: Set<string>
+        newBeneficiaries: Set<string>
+        pairVolume: Record<string, number>
       }
+    > = {}
+
+    operationsByDay?.forEach((op) => {
+      const date = new Date(op.created_at).toISOString().split("T")[0]
+      if (!dataByDay[date]) {
+        dataByDay[date] = {
+          date,
+          gtv: 0,
+          ttv: 0,
+          revenue: 0,
+          newUsers: new Set(),
+          newBeneficiaries: new Set(),
+          pairVolume: {},
+        }
+      }
+
+      // GTV (Gross Transaction Volume) - suma de source_amount si completed
+      if (op.status === "completed") {
+        dataByDay[date].gtv += op.source_amount || 0
+        dataByDay[date].ttv += 1
+      }
+
+      // Revenue (fees)
+      dataByDay[date].revenue += op.fee_amount || 0
+
+      // Track usuarios únicos
+      if (op.user_email) dataByDay[date].newUsers.add(op.user_email)
+      // Track beneficiarios únicos (usando beneficiary_id)
+      if (op.beneficiary_id) dataByDay[date].newBeneficiaries.add(op.beneficiary_id)
+
+      // Volumen por par
+      const pair = op.currency_pair?.replace("_", "-") || "Unknown"
+      dataByDay[date].pairVolume[pair] = (dataByDay[date].pairVolume[pair] || 0) + 1
     })
 
-    const topCurrencyPairs = Object.entries(pairCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([pair, count]) => ({ pair, count }))
+    // Convertir a array y calcular conteos
+    const chartData = Object.values(dataByDay).map((day) => ({
+      date: day.date,
+      gtv: Math.round(day.gtv * 100) / 100,
+      ttv: day.ttv,
+      revenue: Math.round(day.revenue * 100) / 100,
+      uniqueUsers: day.newUsers.size,
+      uniqueBeneficiaries: day.newBeneficiaries.size,
+    }))
+
+    // Totales
+    const totalGTV = Math.round(chartData.reduce((sum, d) => sum + d.gtv, 0) * 100) / 100
+    const totalTTV = chartData.reduce((sum, d) => sum + d.ttv, 0)
+    const totalRevenue = Math.round(chartData.reduce((sum, d) => sum + d.revenue, 0) * 100) / 100
+    const totalUniqueUsers = new Set(operationsByDay?.map((op) => op.user_email).filter(Boolean))
+      .size
+    const totalUniqueBeneficiaries = new Set(
+      operationsByDay?.map((op) => op.beneficiary_id).filter(Boolean)
+    ).size
 
     // ==========================================
-    // Total de usuarios
+    // Datos período anterior para comparación
     // ==========================================
-    const { count: totalUsers } = await supabaseServer
-      .from("users")
-      .select("*", { count: "exact", head: true })
-
-    // ==========================================
-    // Operaciones recientes (últimas 10)
-    // ==========================================
-    const { data: recentOperations } = await supabaseServer
+    const { data: prevOperationsByDay } = await supabaseServer
       .from("operations")
-      .select("id, operation_number, status, mode, currency_pair, source_amount, source_currency, user_email, created_at")
-      .order("created_at", { ascending: false })
-      .limit(10)
+      .select("source_amount, status, fee_amount")
+      .gte("created_at", prevPeriodStartISO)
+      .lte("created_at", prevPeriodEndISO)
+
+    const prevGTV =
+      prevOperationsByDay?.reduce((sum, op) => (op.status === "completed" ? sum + (op.source_amount || 0) : sum), 0) || 0
+    const prevTTV = prevOperationsByDay?.filter((op) => op.status === "completed").length || 0
+    const prevRevenue =
+      prevOperationsByDay?.reduce((sum, op) => sum + (op.fee_amount || 0), 0) || 0
+
+    // Calcular cambios porcentuales
+    const calculateChange = (current: number, previous: number): number => {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return Math.round(((current - previous) / previous) * 100)
+    }
+
+    // ==========================================
+    // Distribución por par
+    // ==========================================
+    const pairDistribution: Record<string, number> = {}
+    operationsByDay?.forEach((op) => {
+      const pair = op.currency_pair?.replace("_", "-") || "Unknown"
+      pairDistribution[pair] = (pairDistribution[pair] || 0) + 1
+    })
+
+    const topPairs = Object.entries(pairDistribution)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([pair, count]) => ({ name: pair, value: count }))
 
     // ==========================================
     // Tasas activas
@@ -143,33 +199,39 @@ export async function GET(request: NextRequest) {
       .eq("is_active", true)
 
     const stats = {
-      // Conteos por estado
+      // KPIs con comparación
+      kpis: {
+        gtv: {
+          current: totalGTV,
+          previous: Math.round(prevGTV * 100) / 100,
+          change: calculateChange(totalGTV, prevGTV),
+        },
+        ttv: {
+          current: totalTTV,
+          previous: prevTTV,
+          change: calculateChange(totalTTV, prevTTV),
+        },
+        revenue: {
+          current: totalRevenue,
+          previous: Math.round(prevRevenue * 100) / 100,
+          change: calculateChange(totalRevenue, prevRevenue),
+        },
+        uniqueBeneficiaries: {
+          current: totalUniqueBeneficiaries,
+          previous: 0,
+          change: 0,
+        },
+      },
+      // Datos por día para gráficos
+      chartData,
+      // Distribución
+      pairDistribution: topPairs,
+      // Conteos de estado
       byStatus: {
-        pending: pendingCount || 0,
-        awaiting_payment: awaitingPaymentCount || 0,
-        processing: processingCount || 0,
-        completedToday: completedTodayCount || 0,
-        cancelledToday: cancelledTodayCount || 0,
+        in_progress: inProgressCount || 0,
+        completed: completedCount || 0,
+        cancelled: cancelledCount || 0,
       },
-      // Volumen
-      volume: {
-        today: volumeToday,
-        week: volumeWeek,
-        month: volumeMonth,
-      },
-      // Conteos por modo
-      byMode: {
-        send: sendCount || 0,
-        receive: receiveCount || 0,
-        buy_usdt: buyUsdtCount || 0,
-        sell_usdt: sellUsdtCount || 0,
-      },
-      // Top pares de divisas
-      topCurrencyPairs,
-      // Usuarios
-      totalUsers: totalUsers || 0,
-      // Operaciones recientes
-      recentOperations: recentOperations || [],
       // Tasas
       rates: {
         active: activeRates || [],

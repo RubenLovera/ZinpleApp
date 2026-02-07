@@ -4,6 +4,18 @@ import React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -45,13 +57,13 @@ import {
   Edit2,
   Save,
   X,
+  GripVertical,
 } from "lucide-react"
 
 interface Stats {
   byStatus: {
     pending: number
-    awaiting_payment: number
-    processing: number
+    in_progress: number
     completedToday: number
     cancelledToday: number
   }
@@ -123,16 +135,14 @@ interface OperationLog {
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  awaiting_payment: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  processing: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  in_progress: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 }
 
 const statusLabels: Record<string, string> = {
   pending: "Pendiente",
-  awaiting_payment: "Esperando Pago",
-  processing: "Procesando",
+  in_progress: "En Proceso",
   completed: "Completada",
   cancelled: "Cancelada",
 }
@@ -151,12 +161,144 @@ const modeIcons: Record<string, React.ReactNode> = {
   sell_usdt: <DollarSign className="h-4 w-4" />,
 }
 
+// Componente para fila sorteable de tasa
+function RateRow({
+  rate,
+  editingRate,
+  editRateValues,
+  actionLoading,
+  onEdit,
+  onSave,
+  onCancel,
+  onToggle,
+  onEditChange,
+}: {
+  rate: any
+  editingRate: string | null
+  editRateValues: { rate: string; fee: string }
+  actionLoading: boolean
+  onEdit: () => void
+  onSave: () => void
+  onCancel: () => void
+  onToggle: () => void
+  onEditChange: (values: { rate: string; fee: string }) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: rate.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded-lg border ${
+        !rate.is_active ? "opacity-50 bg-muted/30" : ""
+      } ${isDragging ? "shadow-lg bg-accent/10" : ""}`}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+        >
+          <GripVertical className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div>
+          <p className="font-semibold">{rate.currency_pair.replace("_", " / ")}</p>
+          <p className="text-xs text-muted-foreground">
+            {rate.provider || "Manual"} - Actualizado: {formatDate(rate.updated_at)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        {editingRate === rate.id ? (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.0001"
+              className="w-28"
+              value={editRateValues.rate}
+              onChange={(e) => onEditChange({ ...editRateValues, rate: e.target.value })}
+              placeholder="Tasa"
+            />
+            <Input
+              type="number"
+              step="0.01"
+              className="w-20"
+              value={editRateValues.fee}
+              onChange={(e) => onEditChange({ ...editRateValues, fee: e.target.value })}
+              placeholder="Fee %"
+            />
+            <Button size="sm" onClick={onSave} disabled={actionLoading}>
+              <Save className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onCancel}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="text-right">
+              <p className="font-semibold">{rate.rate}</p>
+              <p className="text-xs text-muted-foreground">
+                Fee: {(rate.fee_percentage * 100).toFixed(2)}%
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onEdit}
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant={rate.is_active ? "ghost" : "default"}
+                onClick={onToggle}
+              >
+                {rate.is_active ? "Desactivar" : "Activar"}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
   const [adminEmail, setAdminEmail] = useState("")
+
+  // Date range state
+  const [dateRange, setDateRange] = useState<{ startDate: Date; endDate: Date }>({
+    startDate: (() => {
+      const d = new Date()
+      d.setDate(d.getDate() - 7)
+      return d
+    })(),
+    endDate: new Date(),
+  })
+  const [dateRangeMode, setDateRangeMode] = useState<"today" | "7days" | "30days" | "custom">("7days")
 
   // Operations state
   const [operations, setOperations] = useState<Operation[]>([])
@@ -177,6 +319,17 @@ export default function AdminDashboard() {
   const [ratesLoading, setRatesLoading] = useState(false)
   const [editingRate, setEditingRate] = useState<string | null>(null)
   const [editRateValues, setEditRateValues] = useState<{rate: string, fee: string}>({rate: "", fee: ""})
+  const [ratesSortOrder, setRatesSortOrder] = useState<string[]>([])
+
+  // Drag & drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      distance: 8,
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("zinple_admin_auth")
@@ -197,10 +350,18 @@ export default function AdminDashboard() {
     }
   }, [activeTab, operationsPage, operationsFilter])
 
+  useEffect(() => {
+    if (activeTab === "overview") {
+      fetchStats()
+    }
+  }, [dateRange])
+
   const fetchStats = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/admin/stats")
+      const startDate = formatDateForAPI(dateRange.startDate)
+      const endDate = formatDateForAPI(dateRange.endDate)
+      const response = await fetch(`/api/admin/stats?startDate=${startDate}&endDate=${endDate}`)
       const data = await response.json()
       if (data.stats) {
         setStats(data.stats)
@@ -344,6 +505,70 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleDateRangeChange = (mode: "today" | "7days" | "30days" | "custom", customStart?: Date, customEnd?: Date) => {
+    setDateRangeMode(mode)
+    const end = new Date()
+    end.setHours(23, 59, 59, 999)
+    let start = new Date()
+    start.setHours(0, 0, 0, 0)
+
+    switch (mode) {
+      case "today":
+        start = new Date()
+        start.setHours(0, 0, 0, 0)
+        break
+      case "7days":
+        start.setDate(start.getDate() - 7)
+        break
+      case "30days":
+        start.setDate(start.getDate() - 30)
+        break
+      case "custom":
+        if (customStart && customEnd) {
+          start = customStart
+          end.setTime(customEnd.getTime())
+        }
+        break
+    }
+    setDateRange({ startDate: start, endDate: end })
+  }
+
+  const formatDateForAPI = (date: Date): string => {
+    return date.toISOString().split("T")[0]
+  }
+
+  const handleDragEndRates = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = rates.findIndex((r) => r.id === active.id)
+      const newIndex = rates.findIndex((r) => r.id === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newRates = arrayMove(rates, oldIndex, newIndex)
+        setRates(newRates)
+
+        // Guardar el nuevo orden en BD
+        const updates = newRates.map((rate, index) => ({
+          id: rate.id,
+          display_order: index + 1,
+        }))
+
+        const response = await fetch("/api/admin/rates", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates, adminEmail }),
+        })
+
+        const data = await response.json()
+        if (!data.success) {
+          console.error("Error updating rates order:", data.error)
+          fetchRates() // Revert en caso de error
+        }
+      }
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem("zinple_admin_auth")
     localStorage.removeItem("adminEmail")
@@ -357,30 +582,7 @@ export default function AdminDashboard() {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("es-CL", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  if (loading && !stats) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-          <span>Cargando dashboard...</span>
-        </div>
-      </div>
-    )
-  }
-
-  const pendingTotal =
-    (stats?.byStatus.pending || 0) +
-    (stats?.byStatus.awaiting_payment || 0) +
-    (stats?.byStatus.processing || 0)
+  const pendingTotal = (stats?.byStatus?.in_progress || 0)
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -434,130 +636,159 @@ export default function AdminDashboard() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Date Range Filter */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={dateRangeMode === "today" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleDateRangeChange("today")}
+              >
+                Hoy
+              </Button>
+              <Button
+                variant={dateRangeMode === "7days" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleDateRangeChange("7days")}
+              >
+                7 días
+              </Button>
+              <Button
+                variant={dateRangeMode === "30days" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleDateRangeChange("30days")}
+              >
+                30 días
+              </Button>
+            </div>
+
+            {/* KPIs with Change Indicators */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="border-l-4 border-l-amber-500">
+              {/* GTV KPI */}
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-                  <Clock className="h-4 w-4 text-amber-500" />
+                  <CardTitle className="text-sm font-medium">Volumen Bruto</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.pending || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    + {stats?.byStatus.awaiting_payment || 0} esperando pago
+                  <div className="text-2xl font-bold">
+                    ${stats?.volume?.today ? stats.volume.today.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0"}
+                  </div>
+                  <p className={`text-xs font-semibold ${(stats?.volume?.today || 0) >= (stats?.volume?.yesterday || 0) ? "text-emerald-600" : "text-red-600"}`}>
+                    {(stats?.volume?.today || 0) >= (stats?.volume?.yesterday || 0) ? "↑" : "↓"} {Math.abs(((stats?.volume?.today || 0) - (stats?.volume?.yesterday || 0)) / (stats?.volume?.yesterday || 1) * 100).toFixed(2)}% vs ayer
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-purple-500">
+              {/* TTV KPI */}
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">En Proceso</CardTitle>
-                  <RefreshCw className="h-4 w-4 text-purple-500" />
+                  <CardTitle className="text-sm font-medium">Transacciones</CardTitle>
+                  <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.processing || 0}</div>
+                  <div className="text-2xl font-bold">{stats?.rates?.total || 0}</div>
+                  <p className={`text-xs font-semibold ${(stats?.rates?.total || 0) >= (stats?.rates?.previousTotal || 0) ? "text-emerald-600" : "text-red-600"}`}>
+                    {(stats?.rates?.total || 0) >= (stats?.rates?.previousTotal || 0) ? "↑" : "↓"} {Math.abs(((stats?.rates?.total || 0) - (stats?.rates?.previousTotal || 0)) / (stats?.rates?.previousTotal || 1) * 100).toFixed(2)}% vs anterior
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Revenue KPI */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${stats?.kpis?.revenue?.current ? stats.kpis.revenue.current.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "0"}
+                  </div>
+                  <p className={`text-xs font-semibold ${(stats?.kpis?.revenue?.change || 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {(stats?.kpis?.revenue?.change || 0) >= 0 ? "↑" : "↓"} {Math.abs(stats?.kpis?.revenue?.change || 0)}% vs anterior
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Beneficiaries KPI */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Destinatarios</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
+                  <p className="text-xs text-muted-foreground">Únicos en período</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Status Overview */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">En Proceso</CardTitle>
+                  <RefreshCw className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.byStatus?.in_progress || 0}</div>
                   <p className="text-xs text-muted-foreground">Requieren atención</p>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-emerald-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completadas Hoy</CardTitle>
+                  <CardTitle className="text-sm font-medium">Completadas</CardTitle>
                   <CheckCircle className="h-4 w-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.completedToday || 0}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-                    Exitosas
-                  </p>
+                  <div className="text-2xl font-bold">{stats?.byStatus?.completedToday || 0}</div>
+                  <p className="text-xs text-muted-foreground">Hoy</p>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-red-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Canceladas Hoy</CardTitle>
+                  <CardTitle className="text-sm font-medium">Canceladas</CardTitle>
                   <XCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.byStatus.cancelledToday || 0}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <ArrowDownRight className="h-3 w-3 text-red-500" />
-                    Fallidas
-                  </p>
+                  <div className="text-2xl font-bold">{stats?.byStatus?.cancelledToday || 0}</div>
+                  <p className="text-xs text-muted-foreground">Hoy</p>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                    Volumen Procesado
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Hoy</span>
-                    <span className="font-semibold">${formatCurrency(stats?.volume.today || 0)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Últimos 7 días</span>
-                    <span className="font-semibold">${formatCurrency(stats?.volume.week || 0)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Últimos 30 días</span>
-                    <span className="font-semibold">${formatCurrency(stats?.volume.month || 0)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                    Por Tipo de Operación
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {Object.entries(stats?.byMode || {}).map(([mode, count]) => (
-                    <div key={mode} className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground flex items-center gap-2">
-                        {modeIcons[mode]}
-                        {modeLabels[mode]}
-                      </span>
-                      <span className="font-semibold">{count}</span>
+            {/* Top Currency Pairs Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Pares Más Utilizados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(stats?.topCurrencyPairs || []).map((pair) => (
+                    <div key={pair.pair} className="flex items-center justify-between">
+                      <span className="text-sm">{pair.pair.replace("_", " / ")}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary h-2 rounded-full"
+                            style={{
+                              width: `${((pair.count / (stats?.topCurrencyPairs?.[0]?.count || 1)) * 100) || 0}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold w-8 text-right">{pair.count}</span>
+                      </div>
                     </div>
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    Top Pares de Divisas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {stats?.topCurrencyPairs.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Sin datos aún</p>
-                  )}
-                  {stats?.topCurrencyPairs.map((item, index) => (
-                    <div key={item.pair} className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                        {item.pair.replace("_", " / ")}
-                      </span>
-                      <span className="font-semibold">{item.count}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-
+            {/* Recent Operations */}
             <div className="grid gap-4 lg:grid-cols-3">
               <Card>
                 <CardHeader>
@@ -634,7 +865,7 @@ export default function AdminDashboard() {
                         className="pl-8 w-48"
                         value={operationsFilter.search}
                         onChange={(e) => {
-                          setOperationsFilter({...operationsFilter, search: e.target.value})
+                          setOperationsFilter({ ...operationsFilter, search: e.target.value })
                           setOperationsPage(0)
                         }}
                       />
@@ -642,7 +873,7 @@ export default function AdminDashboard() {
                     <Select
                       value={operationsFilter.status}
                       onValueChange={(v) => {
-                        setOperationsFilter({...operationsFilter, status: v})
+                        setOperationsFilter({ ...operationsFilter, status: v })
                         setOperationsPage(0)
                       }}
                     >
@@ -652,8 +883,7 @@ export default function AdminDashboard() {
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="pending">Pendiente</SelectItem>
-                        <SelectItem value="awaiting_payment">Esperando Pago</SelectItem>
-                        <SelectItem value="processing">Procesando</SelectItem>
+                        <SelectItem value="in_progress">En Proceso</SelectItem>
                         <SelectItem value="completed">Completada</SelectItem>
                         <SelectItem value="cancelled">Cancelada</SelectItem>
                       </SelectContent>
@@ -661,7 +891,7 @@ export default function AdminDashboard() {
                     <Select
                       value={operationsFilter.mode}
                       onValueChange={(v) => {
-                        setOperationsFilter({...operationsFilter, mode: v})
+                        setOperationsFilter({ ...operationsFilter, mode: v })
                         setOperationsPage(0)
                       }}
                     >
@@ -740,7 +970,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={operationsPage === 0}
-                        onClick={() => setOperationsPage(p => p - 1)}
+                        onClick={() => setOperationsPage((p) => p - 1)}
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
@@ -748,7 +978,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={(operationsPage + 1) * 20 >= operationsTotal}
-                        onClick={() => setOperationsPage(p => p + 1)}
+                        onClick={() => setOperationsPage((p) => p + 1)}
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -823,32 +1053,11 @@ export default function AdminDashboard() {
 
                     {/* Actions */}
                     <div className="border-t pt-4 flex flex-wrap gap-2">
-                      {selectedOperation.status === "pending" && (
+                      {selectedOperation.status === "in_progress" && (
                         <>
                           <Button
                             size="sm"
-                            onClick={() => handleOperationAction("approve")}
-                            disabled={actionLoading}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            Aprobar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleOperationAction("cancel")}
-                            disabled={actionLoading}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        </>
-                      )}
-                      {selectedOperation.status === "processing" && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
                             onClick={() => handleOperationAction("complete")}
                             disabled={actionLoading}
                           >
@@ -929,90 +1138,39 @@ export default function AdminDashboard() {
                     No hay tasas configuradas
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {rates.map((rate) => (
-                      <div
-                        key={rate.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${!rate.is_active ? "opacity-50 bg-muted/30" : ""}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <p className="font-semibold">{rate.currency_pair.replace("_", " / ")}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {rate.provider || "Manual"} - Actualizado: {formatDate(rate.updated_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {editingRate === rate.id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                step="0.0001"
-                                className="w-28"
-                                value={editRateValues.rate}
-                                onChange={(e) => setEditRateValues({...editRateValues, rate: e.target.value})}
-                                placeholder="Tasa"
-                              />
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="w-20"
-                                value={editRateValues.fee}
-                                onChange={(e) => setEditRateValues({...editRateValues, fee: e.target.value})}
-                                placeholder="Fee %"
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateRate(rate.id)}
-                                disabled={actionLoading}
-                              >
-                                <Save className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingRate(null)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="text-right">
-                                <p className="font-semibold">{rate.rate}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Fee: {(rate.fee_percentage * 100).toFixed(2)}%
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingRate(rate.id)
-                                    setEditRateValues({
-                                      rate: String(rate.rate),
-                                      fee: String(rate.fee_percentage),
-                                    })
-                                  }}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant={rate.is_active ? "ghost" : "default"}
-                                  onClick={() => handleToggleRateActive(rate)}
-                                >
-                                  {rate.is_active ? "Desactivar" : "Activar"}
-                                </Button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEndRates}
+                  >
+                    <SortableContext
+                      items={rates.map((r) => r.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {rates.map((rate) => (
+                          <RateRow
+                            key={rate.id}
+                            rate={rate}
+                            editingRate={editingRate}
+                            editRateValues={editRateValues}
+                            actionLoading={actionLoading}
+                            onEdit={() => {
+                              setEditingRate(rate.id)
+                              setEditRateValues({
+                                rate: String(rate.rate),
+                                fee: String(rate.fee_percentage),
+                              })
+                            }}
+                            onSave={() => handleUpdateRate(rate.id)}
+                            onCancel={() => setEditingRate(null)}
+                            onToggle={() => handleToggleRateActive(rate)}
+                            onEditChange={setEditRateValues}
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </CardContent>
             </Card>
@@ -1039,7 +1197,7 @@ export default function AdminDashboard() {
                   <div>
                     <p className="font-medium">Tasas activas</p>
                     <p className="text-sm text-muted-foreground">
-                      {rates.filter(r => r.is_active).length} de {rates.length} pares
+                      {rates.filter((r) => r.is_active).length} de {rates.length} pares
                     </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setActiveTab("rates")}>
