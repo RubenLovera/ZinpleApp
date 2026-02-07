@@ -26,7 +26,9 @@ export async function GET() {
     const formattedRates: Record<string, { rate: number; fee: number; min: number; max: number }> = {}
 
     for (const rate of rates || []) {
-      formattedRates[rate.currency_pair] = {
+      // Normalizar: la BD usa underscore (USD_VES) pero la calculadora espera dash (USD-VES)
+      const normalizedPair = rate.currency_pair.replace(/_/g, "-")
+      formattedRates[normalizedPair] = {
         rate: Number.parseFloat(rate.rate),
         fee: Number.parseFloat(rate.fee_percentage),
         min: Number.parseFloat(rate.min_amount || "0"),
