@@ -629,7 +629,7 @@ export default function AdminDashboard() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="users" onClick={() => router.push("/admin/users")} className="flex items-center gap-2">
+            <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Clientes</span>
             </TabsTrigger>
