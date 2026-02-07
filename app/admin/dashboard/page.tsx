@@ -59,6 +59,8 @@ import {
   X,
   GripVertical,
 } from "lucide-react"
+import UsersList from "@/components/admin/UsersList"
+import UserProfile from "@/components/admin/UserProfile"
 
 interface Stats {
   byStatus: {
@@ -330,6 +332,9 @@ export default function AdminDashboard() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  // Users state
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("zinple_admin_auth")
@@ -1116,6 +1121,15 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               </div>
+            )}
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-4">
+            {!selectedUserId ? (
+              <UsersList onSelectUser={setSelectedUserId} />
+            ) : (
+              <UserProfile userId={selectedUserId} onBack={() => setSelectedUserId(null)} />
             )}
           </TabsContent>
 
