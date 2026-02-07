@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         currency_pair,
         fee_amount,
         user_email,
-        destination_email
+        beneficiary_id
       `
       )
       .gte("created_at", startDateISO)
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         ttv: number
         revenue: number
         newUsers: Set<string>
-        newDestinations: Set<string>
+        newBeneficiaries: Set<string>
         pairVolume: Record<string, number>
       }
     > = {}
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
           ttv: 0,
           revenue: 0,
           newUsers: new Set(),
-          newDestinations: new Set(),
+          newBeneficiaries: new Set(),
           pairVolume: {},
         }
       }
@@ -127,8 +127,8 @@ export async function GET(request: NextRequest) {
 
       // Track usuarios únicos
       if (op.user_email) dataByDay[date].newUsers.add(op.user_email)
-      if (op.destination_email)
-        dataByDay[date].newDestinations.add(op.destination_email)
+      // Track beneficiarios únicos (usando beneficiary_id)
+      if (op.beneficiary_id) dataByDay[date].newBeneficiaries.add(op.beneficiary_id)
 
       // Volumen por par
       const pair = op.currency_pair?.replace("_", "-") || "Unknown"
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
       ttv: day.ttv,
       revenue: Math.round(day.revenue * 100) / 100,
       uniqueUsers: day.newUsers.size,
-      uniqueDestinations: day.newDestinations.size,
+      uniqueBeneficiaries: day.newBeneficiaries.size,
     }))
 
     // Totales
@@ -151,8 +151,8 @@ export async function GET(request: NextRequest) {
     const totalRevenue = Math.round(chartData.reduce((sum, d) => sum + d.revenue, 0) * 100) / 100
     const totalUniqueUsers = new Set(operationsByDay?.map((op) => op.user_email).filter(Boolean))
       .size
-    const totalUniqueDestinations = new Set(
-      operationsByDay?.map((op) => op.destination_email).filter(Boolean)
+    const totalUniqueBeneficiaries = new Set(
+      operationsByDay?.map((op) => op.beneficiary_id).filter(Boolean)
     ).size
 
     // ==========================================
@@ -216,9 +216,9 @@ export async function GET(request: NextRequest) {
           previous: Math.round(prevRevenue * 100) / 100,
           change: calculateChange(totalRevenue, prevRevenue),
         },
-        uniqueUsers: {
-          current: totalUniqueUsers,
-          previous: 0, // Se calcula en frontend si es necesario
+        uniqueBeneficiaries: {
+          current: totalUniqueBeneficiaries,
+          previous: 0,
           change: 0,
         },
       },
