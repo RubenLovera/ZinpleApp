@@ -22,21 +22,21 @@ export async function sendOperationEmail(
     switch (type) {
       case 'operation-created':
         emailData = {
-          userName: user.fullName,
+          userName: user.fullName || 'Usuario',
           operationId,
           operationType,
-          sendAmount: quote.amount.toLocaleString(),
-          sendCurrency: quote.sourceCurrency,
-          receiveAmount: quote.result.toLocaleString(),
-          receiveCurrency: quote.destinationCurrency,
-          exchangeRate: quote.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+          sendAmount: quote?.amount ? quote.amount.toLocaleString('es-ES') : '0.00',
+          sendCurrency: quote?.sourceCurrency || 'USD',
+          receiveAmount: quote?.result ? quote.result.toLocaleString('es-ES') : '0.00',
+          receiveCurrency: quote?.destinationCurrency || 'USDT',
+          exchangeRate: quote?.exchangeRate ? quote.exchangeRate.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : '0.00',
           beneficiaryName: beneficiary?.fullName || 'N/A',
-          paymentMethod: operation.payment_method || 'No especificado',
+          paymentMethod: operation?.payment_method || 'No especificado',
         }
         break
 
       case 'operation-completed':
-        const completedDate = operation.completed_at
+        const completedDate = operation?.completed_at
           ? new Date(operation.completed_at).toLocaleDateString('es-ES', {
               year: 'numeric',
               month: 'long',
@@ -46,7 +46,7 @@ export async function sendOperationEmail(
             })
           : 'N/A'
 
-        const processedDate = operation.payment_confirmed_at
+        const processedDate = operation?.payment_confirmed_at
           ? new Date(operation.payment_confirmed_at).toLocaleDateString('es-ES', {
               year: 'numeric',
               month: 'long',
@@ -57,14 +57,14 @@ export async function sendOperationEmail(
           : completedDate
 
         emailData = {
-          userName: user.fullName,
+          userName: user.fullName || 'Usuario',
           operationId,
           operationType,
-          sendAmount: quote.amount.toLocaleString(),
-          sendCurrency: quote.sourceCurrency,
-          receiveAmount: quote.result.toLocaleString(),
-          receiveCurrency: quote.destinationCurrency,
-          exchangeRate: quote.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+          sendAmount: quote?.amount ? quote.amount.toLocaleString('es-ES') : '0.00',
+          sendCurrency: quote?.sourceCurrency || 'USD',
+          receiveAmount: quote?.result ? quote.result.toLocaleString('es-ES') : '0.00',
+          receiveCurrency: quote?.destinationCurrency || 'USDT',
+          exchangeRate: quote?.exchangeRate ? quote.exchangeRate.toLocaleString('es-ES', { maximumFractionDigits: 2 }) : '0.00',
           beneficiaryName: beneficiary?.fullName || 'N/A',
           completedDate,
           processedDate,
@@ -73,7 +73,7 @@ export async function sendOperationEmail(
 
       case 'welcome':
         emailData = {
-          userName: user.fullName,
+          userName: user.fullName || 'Bienvenido',
           whatsappNumber: '56956413113',
         }
         break
@@ -88,9 +88,9 @@ export async function sendOperationEmail(
       data: emailData,
     })
 
-    console.log(`[Operation Email] Sent ${type} to ${recipient} for operation ${operationId}`)
+    console.log(`[v0] Operation Email Sent: ${type} to ${recipient}`)
   } catch (error) {
-    console.error(`[Operation Email Error] Failed to send ${type} email:`, error)
+    console.error(`[v0] Operation Email Error: Failed to send ${type} email:`, error)
     // No lanzar error - los emails no deberían bloquear la operación
   }
 }
