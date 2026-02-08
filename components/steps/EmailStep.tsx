@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
 import { checkUserExists } from "@/lib/database"
+import { sendOperationEmail } from "@/lib/operation-emails"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -56,17 +57,33 @@ export default function EmailStep() {
             : undefined,
         })
       } else {
-        // Usuario nuevo
+        // Usuario nuevo - enviar welcome email
         setIsUserExisting(false)
-        setUser({
+        const newUser = {
           email,
           fullName: "",
           phone: "",
-          userType: "persona",
+          userType: "persona" as const,
           monthlyVolumeExpected: 0,
           receivesThirdPartyPayments: false,
           expectedThirdParties: 0,
-        })
+        }
+        setUser(newUser)
+
+        // Enviar welcome email de forma asíncrona (sin bloquear el flujo)
+        try {
+          await sendOperationEmail("welcome", email, {
+            operationId: "welcome",
+            operationType: "welcome",
+            user: newUser,
+            quote: quote!,
+            operation: {} as any,
+          })
+          console.log("[v0] Welcome email sent to:", email)
+        } catch (emailError) {
+          console.error("[v0] Error sending welcome email:", emailError)
+          // No bloquear el flujo si el email falla
+        }
       }
 
       // Siempre ir a payment-type (tanto para USDT como Bolívares)
