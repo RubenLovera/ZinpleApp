@@ -58,7 +58,7 @@ export function generateWhatsAppMessage(
   let message = `🧾 Comprobante - Operación #${operation.id}\n\n`
 
   if (operationMode === "send") {
-    message += `Hola equipo Zinple, he realizado el envío de fondos.\n\n`
+    message += `Ya he realizado el envío de fondos.\n\n`
 
     message += `📋 DATOS DE LA OPERACIÓN\n`
     message += `📋 ID: #${operation.id}\n`
@@ -81,7 +81,7 @@ export function generateWhatsAppMessage(
     message += getBeneficiaryInfo(beneficiary, false)
 
   } else if (operationMode === "receive") {
-    message += `Hola equipo Zinple, he creado una solicitud de recepción de dinero.\n\n`
+    message += `Ya he creado una solicitud de recepción de dinero.\n\n`
 
     message += `📋 DATOS DE LA OPERACIÓN\n`
     message += `📋 ID: #${operation.id}\n`
@@ -106,7 +106,7 @@ export function generateWhatsAppMessage(
     message += getBeneficiaryInfo(null, true)
 
   } else if (operationMode === "buy_usdt") {
-    message += `Hola equipo Zinple, he realizado el pago para comprar USDT.\n\n`
+    message += `Ya he realizado el pago para comprar USDT.\n\n`
 
     message += `📋 DATOS DE LA OPERACIÓN\n`
     message += `📋 ID: #${operation.id}\n`
@@ -128,7 +128,7 @@ export function generateWhatsAppMessage(
     }
 
   } else if (operationMode === "sell_usdt") {
-    message += `Hola equipo Zinple, quiero vender USDT.\n\n`
+    message += `Ya quiero vender USDT.\n\n`
 
     message += `📋 DATOS DE LA OPERACIÓN\n`
     message += `📋 ID: #${operation.id}\n`
