@@ -38,9 +38,9 @@ Se ha implementado un sistema completo de emails transaccionales con Resend y Re
 1. Ve a https://resend.com
 2. Crea una cuenta y obtén tu API Key
 3. Agrega a Environment Variables:
-   ```
+   \`\`\`
    RESEND_API_KEY=re_xxxxx
-   ```
+   \`\`\`
 
 ### Paso 2: Ejecutar SQL Triggers (Opcional)
 Si quieres que los emails se envíen automáticamente cuando cambia el status de una operación:
@@ -54,7 +54,7 @@ Si quieres que los emails se envíen automáticamente cuando cambia el status de
 **Emails Manuales (siempre funcionan):**
 - Se envía automáticamente en PaymentStep cuando se crea una operación
 - Puedes enviar emails manualmente via API:
-  ```
+  \`\`\`
   POST /api/emails/send
   {
     "type": "welcome",
@@ -64,7 +64,7 @@ Si quieres que los emails se envíen automáticamente cuando cambia el status de
       "whatsappNumber": "56956413113"
     }
   }
-  ```
+  \`\`\`
 
 **Emails Automáticos (con webhooks):**
 - Se envía cuando operación cambia a status "completed"
@@ -86,11 +86,11 @@ Si quieres que los emails se envíen automáticamente cuando cambia el status de
 
 ## Variables de Entorno Requeridas
 
-```
+\`\`\`
 RESEND_API_KEY=tu_api_key_de_resend
 NEXT_PUBLIC_SUPABASE_URL=tu_url_supabase
 SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
-```
+\`\`\`
 
 ## Paleta de Colores
 
