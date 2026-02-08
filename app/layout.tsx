@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Montserrat } from "next/font/google"
 import Script from "next/script"
+import { EmailWebhooksInitializer } from "@/components/EmailWebhooksInitializer"
 import "./globals.css"
 
 const montserrat = Montserrat({ subsets: ["latin"] })
@@ -35,7 +36,10 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={montserrat.className}>{children}</body>
+      <body className={montserrat.className}>
+        <EmailWebhooksInitializer />
+        {children}
+      </body>
     </html>
   )
 }
