@@ -9,7 +9,7 @@ VALUES (
   'ruben@zinpleapp.com',
   '$2b$10$7Z5x9G8K2m1N4p5Q6r7S8tUvWxYzAbCdEfGhIjKlMnOpQrStUvWx',
   'Rubén García',
-  'super_admin',
+  'admin',
   true,
   NOW(),
   NOW()
@@ -26,7 +26,7 @@ VALUES (
   'maria@zinpleapp.com',
   '$2b$10$8A6y9H8L3n2O5q6R7s8T9uVwXyZaBcDeFgHiJkLmNoPqRsStUvWx',
   'María López',
-  'operador',
+  'admin',
   true,
   NOW(),
   NOW()
@@ -43,7 +43,7 @@ VALUES (
   'josber@zinpleapp.com',
   '$2b$10$9B7z9I8M3o2P5r6S7t8U9vWxYyZaCdDeEfGhIjKlMnOpQrStUvWx',
   'Josber Martínez',
-  'operador',
+  'admin',
   true,
   NOW(),
   NOW()
