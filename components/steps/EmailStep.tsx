@@ -71,18 +71,23 @@ export default function EmailStep() {
         setUser(newUser)
 
         // Enviar welcome email de forma asíncrona (sin bloquear el flujo)
-        try {
-          await sendOperationEmail("welcome", email, {
-            operationId: "welcome",
-            operationType: "welcome",
-            user: newUser,
-            quote: quote!,
-            operation: {} as any,
-          })
-          console.log("[v0] Welcome email sent to:", email)
-        } catch (emailError) {
-          console.error("[v0] Error sending welcome email:", emailError)
-          // No bloquear el flujo si el email falla
+        // Solo enviar si quote existe
+        if (quote) {
+          try {
+            await sendOperationEmail("welcome", email, {
+              operationId: "welcome",
+              operationType: "welcome",
+              user: newUser,
+              quote,
+              operation: {} as any,
+            })
+            console.log("[v0] Welcome email sent to:", email)
+          } catch (emailError) {
+            console.error("[v0] Error sending welcome email:", emailError)
+            // No bloquear el flujo si el email falla
+          }
+        } else {
+          console.log("[v0] Welcome email not sent - quote is missing")
         }
       }
 
