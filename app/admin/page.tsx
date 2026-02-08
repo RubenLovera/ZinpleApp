@@ -41,8 +41,10 @@ export default function AdminLoginPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.admin) {
+        // Guardar datos del admin en localStorage
         localStorage.setItem("zinple_admin_auth", "true")
+        localStorage.setItem("zinple_admin_user", JSON.stringify(data.admin))
         router.push("/admin/dashboard")
       } else {
         setError(data.error || "Credenciales incorrectas")

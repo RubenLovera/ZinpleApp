@@ -15,3 +15,8 @@ if (!supabaseServiceKey) {
 console.log("Creating Supabase server client with URL:", supabaseUrl.substring(0, 30) + "...")
 
 export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey)
+
+// Helper function to create a new Supabase server client
+export function createServerClient() {
+  return createClient(supabaseUrl!, supabaseServiceKey!)
+}

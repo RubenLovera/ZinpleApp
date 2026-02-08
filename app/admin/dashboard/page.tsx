@@ -61,6 +61,7 @@ import {
 } from "lucide-react"
 import UsersList from "@/components/admin/UsersList"
 import UserProfile from "@/components/admin/UserProfile"
+import AdminHeader from "@/components/admin/AdminHeader"
 
 interface Stats {
   byStatus: {
@@ -592,26 +593,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-muted/30">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-primary">Zinple Admin</h1>
-            <Badge variant="outline" className="hidden sm:flex">
-              {adminEmail}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Actualizar
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Salir
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
