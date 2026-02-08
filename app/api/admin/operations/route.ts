@@ -83,7 +83,7 @@ export async function PATCH(request: NextRequest) {
       .from("operations")
       .select("*")
       .eq("id", operationId)
-      .single()
+      .maybeSingle()
 
     if (fetchError || !currentOperation) {
       return NextResponse.json({ error: "Operación no encontrada" }, { status: 404 })
@@ -136,7 +136,7 @@ export async function PATCH(request: NextRequest) {
       .update(updateData)
       .eq("id", operationId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (updateError) {
       console.error("Error updating operation:", updateError)
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
       .from("operations")
       .select("*")
       .eq("id", operationId)
-      .single()
+      .maybeSingle()
 
     if (opError || !operation) {
       return NextResponse.json({ error: "Operación no encontrada" }, { status: 404 })
