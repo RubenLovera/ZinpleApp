@@ -1,8 +1,8 @@
-import { sendEmail, type EmailType } from '@/lib/email-sender'
+import { sendEmail } from '@/lib/email-client'
 import type { QuoteData, UserFormData, BeneficiaryData, SenderData, OperationData } from '@/types/database'
 
 export async function sendOperationEmail(
-  type: EmailType,
+  type: 'welcome' | 'operation-created' | 'operation-completed' | 'operation-cancelled' | 'beneficiary-added' | 'new-session' | 'admin-new-operation' | 'admin-operation-completed',
   recipient: string,
   operationData: {
     operationId: string
