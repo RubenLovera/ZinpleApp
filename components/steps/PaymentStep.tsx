@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import { useState, useEffect } from "react"
 import { CheckCircle, MessageCircle, Copy, Clock, AlertTriangle, RefreshCw, Send, Download, Wallet, Share2 } from "lucide-react"
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
 import { getCurrencyInfo, type OperationMode } from "@/types/database"
 import { generateWhatsAppMessage } from "@/lib/utils"
+import { sendOperationEmail } from "@/lib/operation-emails"
 import PaymentInstructions from "@/components/PaymentInstructions"
 import ProgressBar from "@/components/ProgressBar"
 
@@ -14,10 +15,38 @@ export default function PaymentStep() {
   const { quote, user, beneficiary, sender, thirdParty, operation, isThirdPartyPayment, resetFlow, operationMode } = useFlow()
   const [timeLeft, setTimeLeft] = useState(30 * 60) // 30 minutos en segundos
   const [copied, setCopied] = useState<string | null>(null)
+  const [emailSent, setEmailSent] = useState(false)
 
   // Obtener información de las monedas
   const sourceCurrency = quote ? getCurrencyInfo(quote.sourceCurrency) : null
   const destCurrency = quote ? getCurrencyInfo(quote.destinationCurrency) : null
+
+  // Enviar email cuando se carga la página de pago
+  useEffect(() => {
+    if (quote && user && operation && operationMode && !emailSent) {
+      sendOperationEmailOnLoad()
+      setEmailSent(true)
+    }
+  }, [quote, user, operation, operationMode, emailSent])
+
+  const sendOperationEmailOnLoad = async () => {
+    try {
+      if (!quote || !user || !operation || !operationMode) return
+
+      await sendOperationEmail('operation-created', user.email, {
+        operationId: operation.id,
+        operationType: operationMode,
+        user,
+        beneficiary: beneficiary || undefined,
+        sender: sender || undefined,
+        quote,
+        operation,
+      })
+    } catch (error) {
+      console.error('[PaymentStep] Error sending email:', error)
+      // No mostrar error al usuario - el email no debe bloquear la operación
+    }
+  }
 
   // Countdown timer
   useEffect(() => {
