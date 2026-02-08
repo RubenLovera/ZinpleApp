@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       .from("exchange_rates")
       .select("id")
       .eq("currency_pair", currencyPair)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json({ error: "Ya existe una tasa para este par" }, { status: 400 })
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         updated_by: adminEmail,
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error creating rate:", error)
@@ -127,7 +127,7 @@ export async function PATCH(request: NextRequest) {
       .from("exchange_rates")
       .select("*")
       .eq("id", rateId)
-      .single()
+      .maybeSingle()
 
     if (fetchError || !currentRate) {
       return NextResponse.json({ error: "Tasa no encontrada" }, { status: 404 })
@@ -151,7 +151,7 @@ export async function PATCH(request: NextRequest) {
       .update(updateData)
       .eq("id", rateId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (updateError) {
       console.error("Error updating rate:", updateError)
@@ -222,7 +222,7 @@ export async function PUT(request: NextRequest) {
         })
         .eq("id", update.id)
         .select()
-        .single()
+        .maybeSingle()
     )
 
     const results = await Promise.all(updatePromises)
@@ -278,7 +278,7 @@ export async function DELETE(request: NextRequest) {
       })
       .eq("id", rateId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error deleting rate:", error)

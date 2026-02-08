@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       .from("admin_users")
       .select("id, email, password_hash, full_name, is_active")
       .eq("email", email)
-      .single()
+      .maybeSingle()
 
     if (queryError || !admin) {
       return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 })
