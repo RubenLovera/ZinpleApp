@@ -63,7 +63,7 @@ export async function checkUserExists(email: string): Promise<DBUser | null> {
       .from("users")
       .select("*")
       .eq("email", email)
-      .single()
+      .maybeSingle()
 
     if (error && error.code !== "PGRST116") {
       console.error("Error checking user:", error)
@@ -99,7 +99,7 @@ export async function createUser(userData: {
         country: userData.country || null,
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error creating user:", error)
@@ -136,7 +136,7 @@ export async function updateUser(email: string, userData: {
       .update(updateData)
       .eq("email", email)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error updating user:", error)
@@ -156,7 +156,7 @@ export async function getOperationById(id: string): Promise<DBOperation | null> 
       .from("operations")
       .select("*")
       .eq("id", id)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error getting operation:", error)
@@ -176,7 +176,7 @@ export async function getOperationByNumber(operationNumber: string): Promise<DBO
       .from("operations")
       .select("*")
       .eq("operation_number", operationNumber)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error getting operation by number:", error)
@@ -225,7 +225,7 @@ export async function getExchangeRate(currencyPair: string): Promise<{
       .select("rate, fee_percentage, min_amount, max_amount")
       .eq("currency_pair", currencyPair)
       .eq("is_active", true)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("Error getting exchange rate:", error)
