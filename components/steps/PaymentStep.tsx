@@ -1,11 +1,12 @@
-"use client"
+'use client';
 
 import { useState, useEffect } from "react"
 import { CheckCircle, MessageCircle, Copy, Clock, AlertTriangle, RefreshCw, Send, Download, Wallet, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
-import { getCurrencyInfo } from "@/types/database"
+import { getCurrencyInfo, type OperationMode } from "@/types/database"
+import { generateWhatsAppMessage } from "@/lib/utils"
 import PaymentInstructions from "@/components/PaymentInstructions"
 import ProgressBar from "@/components/ProgressBar"
 
@@ -50,85 +51,19 @@ export default function PaymentStep() {
   }
 
   const handleWhatsAppContact = () => {
-    if (!quote || !user || !operation) return
+    if (!quote || !user || !operation || !operationMode) return
 
-    const payerName = isThirdPartyPayment ? thirdParty?.name : user.fullName
-    const payerPhone = isThirdPartyPayment ? thirdParty?.phone : user.phone
-
-    // Construir mensaje según el modo de operación
-    let message = ""
-    
-    if (operationMode === "send") {
-      message = `Hola! Ya he enviado los fondos para mi operación de envío internacional.
-
-*DATOS DE LA OPERACION*
-ID: *${operation.id}*
-Monto enviado: *${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}*
-Beneficiario recibe: *${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}*
-
-*DATOS DEL REMITENTE*
-Nombre: ${user.fullName}
-Email: ${user.email}
-Teléfono: ${user.phone}
-
-*DATOS DEL BENEFICIARIO*
-Nombre: ${beneficiary?.fullName}
-Teléfono: ${beneficiary?.phone}
-${beneficiary?.pagomovil ? `Pago Móvil: 0${beneficiary.pagomovil.phone} - ${beneficiary.pagomovil.bank}` : ""}
-
-Adjunto el comprobante de pago.`
-    } else if (operationMode === "receive") {
-      message = `Hola! He creado una solicitud de recepción de dinero.
-
-*DATOS DE LA OPERACION*
-ID: *${operation.id}*
-Remitente envía: *${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}*
-Yo recibo: *${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}*
-
-*MIS DATOS (BENEFICIARIO)*
-Nombre: ${user.fullName}
-Email: ${user.email}
-Teléfono: ${user.phone}
-${user.pagomovil ? `Pago Móvil: 0${user.pagomovil.phone} - ${user.pagomovil.bank}` : ""}
-
-*DATOS DEL REMITENTE*
-Nombre: ${sender?.fullName}
-País: ${sender?.country}
-Teléfono: ${sender?.phone}
-
-Por favor generen el link de pago para compartir con el remitente.`
-    } else if (operationMode === "buy_usdt") {
-      message = `Hola! Ya he enviado los fondos para comprar USDT.
-
-*DATOS DE LA OPERACION*
-ID: *${operation.id}*
-Monto enviado: *${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}*
-USDT a recibir: *${quote.result.toLocaleString()} USDT*
-
-*MIS DATOS*
-Nombre: ${user.fullName}
-Email: ${user.email}
-Teléfono: ${user.phone}
-Wallet USDT (Polygon): ${user.walletAddress}
-
-Adjunto el comprobante de pago.`
-    } else if (operationMode === "sell_usdt") {
-      message = `Hola! Quiero vender USDT.
-
-*DATOS DE LA OPERACION*
-ID: *${operation.id}*
-USDT a vender: *${quote.amount.toLocaleString()} USDT*
-Bolívares a recibir: *Bs ${quote.result.toLocaleString()} VES*
-
-*MIS DATOS*
-Nombre: ${user.fullName}
-Email: ${user.email}
-Teléfono: ${user.phone}
-Pago Móvil: 0${user.pagomovil?.phone} - ${user.pagomovil?.bank}
-Cédula: ${user.pagomovil?.cedula}
-
-Por favor indíquenme la wallet donde debo enviar los USDT.`
-    }
+    // Generar el mensaje usando la función helper
+    const message = generateWhatsAppMessage(
+      operationMode as OperationMode,
+      quote,
+      user,
+      beneficiary,
+      sender,
+      operation,
+      user.walletAddress, // Para buy_usdt y si aplica
+      "Polygon" // Red fija (solo Polygon soportado)
+    )
 
     const whatsappUrl = `https://wa.me/56956413113?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
@@ -148,7 +83,7 @@ Por favor indíquenme la wallet donde debo enviar los USDT.`
     resetFlow()
   }
 
-  if (!quote || !user || !operation) {
+  if (!quote || !user || !operation || !operationMode) {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="container mx-auto max-w-2xl">
@@ -332,7 +267,7 @@ Por favor indíquenme la wallet donde debo enviar los USDT.`
                   </Button>
                 </div>
                 <p className="text-sm text-green-600">
-                  Una vez que el remitente complete el pago, recibirás tus bolívares automáticamente por Pago Móvil.
+                  Una vez que el remitente complete el pago, recibirás tus fondos automáticamente.
                 </p>
               </CardContent>
             </Card>
@@ -387,7 +322,7 @@ Por favor indíquenme la wallet donde debo enviar los USDT.`
                       <div>
                         <p className="font-medium">Recibe automáticamente</p>
                         <p className="text-gray-600 text-sm mt-1">
-                          Una vez confirmado el pago, recibirás tus bolívares por Pago Móvil
+                          Una vez confirmado el pago, recibirás tus fondos automáticamente por Pago Móvil.
                         </p>
                       </div>
                     </div>
