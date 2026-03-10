@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, CheckCircle, AlertTriangle, Shield, Users, Globe, Settings, Send, Download, Wallet } from "lucide-react"
+import { ArrowLeft, CheckCircle, Shield, Users, Globe, Settings, Send, Download, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -187,77 +187,34 @@ export default function TermsStep() {
               </CardContent>
             </Card>
 
-            {/* Límites de Seguridad */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  Límites de Seguridad
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <p className="text-gray-700 leading-relaxed">
-                    Como medida de seguridad, las primeras operaciones tienen límites reducidos que aumentan 
-                    progresivamente conforme realices más operaciones exitosas.
-                  </p>
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-yellow-800 font-medium">Verificación de identidad</p>
-                        <p className="text-yellow-700 text-sm mt-1">
-                          Para montos mayores, podríamos solicitar verificación de identidad (KYC) 
-                          para cumplir con regulaciones internacionales.
-                        </p>
-                      </div>
-                    </div>
+            {/* Información adicional */}
+            <Card className="mb-6 border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-blue-800 font-medium">Seguridad y Transparencia</p>
+                    <p className="text-blue-700 text-sm mt-1">
+                      Trabajamos con proveedores regulados como BITSO, BRIDGE y CRIXTO para garantizar 
+                      la seguridad de tus operaciones. Si tienes alguna pregunta, contáctanos por WhatsApp.
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Checkbox de aceptación */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <Checkbox
-                  id="terms"
-                  checked={termsAccepted}
-                  onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <label htmlFor="terms" className="text-gray-900 font-medium cursor-pointer">
-                    Acepto los Términos y Condiciones
-                  </label>
-                  <p className="text-gray-600 text-sm mt-1">
-                    Al marcar esta casilla, confirmo que he leído, entendido y acepto todos los términos y condiciones 
-                    mencionados anteriormente, incluyendo las políticas de privacidad y cumplimiento regulatorio.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Información adicional */}
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-blue-800 font-medium">Seguridad y Transparencia</p>
-                  <p className="text-blue-700 text-sm mt-1">
-                    Trabajamos con proveedores regulados como BITSO, BRIDGE y CRIXTO para garantizar 
-                    la seguridad de tus operaciones. Si tienes alguna pregunta, contáctanos por WhatsApp.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Aceptar términos */}
+          <div className="flex items-center gap-3 py-6 border-t">
+            <Checkbox
+              id="terms-accept"
+              checked={termsAccepted}
+              onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+            />
+            <label htmlFor="terms-accept" className="text-gray-700 cursor-pointer">
+              He leído y acepto los Términos y Condiciones de ZinpleApp
+            </label>
+          </div>
 
           <Button
             onClick={handleContinue}
