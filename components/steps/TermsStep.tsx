@@ -188,20 +188,33 @@ export default function TermsStep() {
             </Card>
 
             {/* Información adicional */}
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-blue-800 font-medium">Seguridad y Transparencia</p>
-                  <p className="text-blue-700 text-sm mt-1">
-                    Trabajamos con proveedores regulados como BITSO, BRIDGE y CRIXTO para garantizar 
-                    la seguridad de tus operaciones. Si tienes alguna pregunta, contáctanos por WhatsApp.
-                  </p>
+            <Card className="mb-6 border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-blue-800 font-medium">Seguridad y Transparencia</p>
+                    <p className="text-blue-700 text-sm mt-1">
+                      Trabajamos con proveedores regulados como BITSO, BRIDGE y CRIXTO para garantizar 
+                      la seguridad de tus operaciones. Si tienes alguna pregunta, contáctanos por WhatsApp.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Aceptar términos */}
+          <div className="flex items-center gap-3 py-6 border-t">
+            <Checkbox
+              id="terms-accept"
+              checked={termsAccepted}
+              onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+            />
+            <label htmlFor="terms-accept" className="text-gray-700 cursor-pointer">
+              He leído y acepto los Términos y Condiciones de ZinpleApp
+            </label>
+          </div>
 
           <Button
             onClick={handleContinue}
