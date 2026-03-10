@@ -329,7 +329,7 @@ export default function MultiCurrencyCalculator() {
 
         {/* Mobile/Tablet dropdown */}
         {isMobile && isOpen && availableCurrenciesList.length > 1 && (
-          <div className="absolute top-full right-0 mt-2 bg-background border border-border rounded-xl shadow-xl z-[9999] max-w-[90vw] max-h-[60vh] overflow-y-auto">
+          <div className="fixed left-4 right-4 mt-2 bg-background border border-border rounded-xl shadow-2xl z-[9999] max-h-[200px] overflow-y-auto" style={{ top: "calc(100% + 0.5rem)", minWidth: "calc(100vw - 2rem)" }}>
             {availableCurrenciesList.map((code) => {
               const curr = currencies[code]
               return (
