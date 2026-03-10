@@ -77,8 +77,23 @@ export async function sendEmailServer(params: SendEmailParams) {
       throw new Error('Failed to create email component')
     }
 
-    // Renderizar HTML
-    const emailHtml = render(emailComponent)
+    // Renderizar HTML con validación
+    let emailHtml: any
+    try {
+      emailHtml = render(emailComponent)
+      console.log('[v0] Email rendered, type:', typeof emailHtml, 'value:', emailHtml)
+    } catch (renderError) {
+      console.error('[v0] Render error:', renderError)
+      throw new Error(`Failed to render email template: ${renderError}`)
+    }
+
+    // Validar que emailHtml sea un string
+    if (typeof emailHtml !== 'string' || !emailHtml) {
+      console.error('[v0] Invalid HTML output:', { emailHtml, type: typeof emailHtml })
+      throw new Error(`Email rendering produced invalid HTML: ${JSON.stringify(emailHtml)}`)
+    }
+
+    console.log('[v0] Sending email with Resend to', to, 'HTML length:', emailHtml.length)
 
     // Enviar con Resend
     const response = await resend.emails.send({
@@ -92,10 +107,10 @@ export async function sendEmailServer(params: SendEmailParams) {
       throw new Error(`Resend error: ${response.error.message}`)
     }
 
-    console.log(`[Email Server] Successfully sent ${type} email to ${to}`)
+    console.log(`[v0] Successfully sent ${type} email to ${to}`)
     return response
   } catch (error) {
-    console.error(`[Email Server Error] Failed to send ${type} email to ${to}:`, error)
+    console.error(`[v0] Failed to send ${type} email to ${to}:`, error)
     throw error
   }
 }

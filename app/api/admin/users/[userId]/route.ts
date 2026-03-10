@@ -13,7 +13,7 @@ export async function GET(
       .from("users")
       .select("*")
       .eq("id", userId)
-      .single()
+      .maybeSingle()
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })

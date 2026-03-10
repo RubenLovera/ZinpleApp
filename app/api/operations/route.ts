@@ -103,10 +103,10 @@ export async function POST(request: NextRequest) {
           .from("users")
           .update(updateData)
           .eq("email", user.email)
-          .select()
-          .single()
+        .select()
+        .maybeSingle()
 
-        if (updateError) {
+      if (updateError) {
           console.error("Error updating user:", updateError)
         } else {
           dbUser = updated
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           country: user.country || null,
         })
         .select()
-        .single()
+        .maybeSingle()
 
       if (createError) {
         console.error("Error creating user:", createError)
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       .from("operations")
       .insert(operationData)
       .select()
-      .single()
+      .maybeSingle()
 
     if (operationError) {
       console.error("Error creating operation:", operationError)
@@ -240,7 +240,7 @@ export async function GET(request: NextRequest) {
       query = query.eq("operation_number", operationNumber)
     }
 
-    const { data: operation, error } = await query.single()
+    const { data: operation, error } = await query.maybeSingle()
 
     if (error) {
       console.error("Error getting operation:", error)
@@ -267,7 +267,7 @@ export async function PATCH(request: NextRequest) {
       .from("operations")
       .select("status")
       .eq("id", operationId)
-      .single()
+      .maybeSingle()
 
     if (getError) {
       return NextResponse.json({ error: "Operación no encontrada" }, { status: 404 })
@@ -287,7 +287,7 @@ export async function PATCH(request: NextRequest) {
       .update(updateData)
       .eq("id", operationId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (updateError) {
       console.error("Error updating operation:", updateError)
