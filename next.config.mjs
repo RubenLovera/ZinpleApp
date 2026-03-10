@@ -13,7 +13,6 @@ const nextConfig = {
     maxInactiveAge: 15 * 1000,
     pagesBufferLength: 5,
   },
-  distDir: '.next-' + Date.now(),
 }
 
 export default nextConfig
