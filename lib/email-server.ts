@@ -80,7 +80,7 @@ export async function sendEmailServer(params: SendEmailParams) {
     // Renderizar HTML con validación
     let emailHtml: any
     try {
-      emailHtml = render(emailComponent)
+      emailHtml = await render(emailComponent)
       console.log('[v0] Email rendered, type:', typeof emailHtml, 'value:', emailHtml)
     } catch (renderError) {
       console.error('[v0] Render error:', renderError)
