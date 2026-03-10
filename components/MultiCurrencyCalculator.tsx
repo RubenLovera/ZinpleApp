@@ -290,7 +290,7 @@ export default function MultiCurrencyCalculator() {
     const currency = currencies[currentValue]
 
     return (
-      <div className="relative" ref={dropdownRef}>
+      <div className="relative overflow-visible" ref={dropdownRef}>
         <button
           onClick={() => isMobile ? setIsMobileModalOpen(true) : setIsOpen(!isOpen)}
           className="flex items-center gap-2 bg-foreground text-background px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
@@ -305,7 +305,7 @@ export default function MultiCurrencyCalculator() {
 
         {/* Desktop dropdown */}
         {!isMobile && isOpen && availableCurrenciesList.length > 1 && (
-          <div className="absolute top-full right-0 mt-2 bg-background border border-border rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden">
+          <div className="absolute top-full right-0 mt-2 bg-background border border-border rounded-xl shadow-xl z-[9999] min-w-[200px] overflow-visible">
             {availableCurrenciesList.map((code) => {
               const curr = currencies[code]
               return (
