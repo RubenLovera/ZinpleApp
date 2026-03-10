@@ -326,6 +326,30 @@ export default function MultiCurrencyCalculator() {
             })}
           </div>
         )}
+
+        {/* Mobile/Tablet dropdown */}
+        {isMobile && isOpen && availableCurrenciesList.length > 1 && (
+          <div className="absolute top-full right-0 mt-2 bg-background border border-border rounded-xl shadow-xl z-[9999] max-w-[90vw] max-h-[60vh] overflow-y-auto">
+            {availableCurrenciesList.map((code) => {
+              const curr = currencies[code]
+              return (
+                <button
+                  key={code}
+                  onClick={() => { onSelect(code); setIsOpen(false) }}
+                  className={`w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 transition-colors text-sm ${
+                    currentValue === code ? "bg-secondary" : ""
+                  }`}
+                >
+                  <span className="text-base">{curr?.symbol}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-foreground text-sm">{code}</div>
+                    <div className="text-xs text-muted-foreground truncate">{curr?.country}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }
