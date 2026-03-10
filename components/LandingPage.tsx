@@ -142,7 +142,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section con Nueva Calculadora */}
-      <section id="inicio" className="relative py-16 md:py-24 px-4 overflow-hidden bg-primary">
+      <section id="inicio" className="relative py-16 md:py-24 px-4 overflow-visible bg-primary">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div
