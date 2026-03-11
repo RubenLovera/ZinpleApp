@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
-import { checkUserExists } from "@/lib/database"
+import { checkUserExists, createUser } from "@/lib/database"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -35,9 +35,10 @@ export default function EmailStep() {
       const existingUser = await checkUserExists(email)
 
       if (existingUser) {
-        // Usuario existente
+        // Usuario existente - guardar con el id
         setIsUserExisting(true)
         setUser({
+          id: existingUser.id,
           email: existingUser.email,
           fullName: existingUser.full_name,
           phone: existingUser.phone,
@@ -56,9 +57,9 @@ export default function EmailStep() {
             : undefined,
         })
       } else {
-        // Usuario nuevo
+        // Usuario nuevo - crear en BD y guardar con el id retornado
         setIsUserExisting(false)
-        const newUser = {
+        const newUserData = {
           email,
           fullName: "",
           phone: "",
@@ -67,7 +68,19 @@ export default function EmailStep() {
           receivesThirdPartyPayments: false,
           expectedThirdParties: 0,
         }
-        setUser(newUser)
+        
+        // Crear el usuario en la base de datos
+        const createdUser = await createUser(email)
+        
+        if (createdUser) {
+          // Guardar con el id del usuario creado
+          setUser({
+            id: createdUser.id,
+            ...newUserData,
+          })
+        } else {
+          throw new Error("No se pudo crear el usuario en la base de datos")
+        }
       }
 
       // Si es usuario nuevo, ir a welcome
