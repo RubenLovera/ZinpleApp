@@ -4,21 +4,12 @@ import { ArrowLeft, CheckCircle, Shield, Users, Globe, Send } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useFlow } from '@/contexts/FlowContext'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export default function WelcomeStep() {
-  const { currentStep, setCurrentStep, getPreviousStep } = useFlow()
+  const { currentStep, setCurrentStep, getPreviousStep, user } = useFlow()
   const [loading, setLoading] = useState(false)
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      setUser(authUser)
-    }
-    getUser()
-  }, [])
 
   const goBack = () => {
     setCurrentStep(getPreviousStep(currentStep))
@@ -27,18 +18,16 @@ export default function WelcomeStep() {
   const handleContinue = async () => {
     setLoading(true)
     try {
-      // Obtener el usuario directamente de la sesión de Supabase
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !authUser) {
-        throw new Error('No hay usuario autenticado. Por favor, inicia sesión.')
+      // Obtener el usuario del FlowContext (ya fue guardado por EmailStep)
+      if (!user) {
+        throw new Error('No hay usuario en el contexto. Por favor, regresa al paso anterior e ingresa tu email nuevamente.')
       }
 
       // Marcar que el usuario ya vio la pantalla de bienvenida
       const { error } = await supabase
         .from('users')
         .update({ has_seen_welcome: true })
-        .eq('id', authUser.id)
+        .eq('id', user.id)
       
       if (error) throw error
       
