@@ -25,6 +25,7 @@ export default function WelcomeStep() {
   }
 
   const handleContinue = async () => {
+    console.log('[v0] BUTTON CLICKED')
     if (!user) return
     
     setLoading(true)
