@@ -23,13 +23,17 @@ export default function WelcomeStep() {
         throw new Error('No hay usuario en el contexto. Por favor, regresa al paso anterior e ingresa tu email nuevamente.')
       }
 
-      // Marcar que el usuario ya vio la pantalla de bienvenida
-      const { error } = await supabase
-        .from('users')
-        .update({ has_seen_welcome: true })
-        .eq('id', user.id)
-      
-      if (error) throw error
+      // Si el usuario tiene id, significa que ya existe en BD - actualizar has_seen_welcome
+      if (user.id) {
+        const { error } = await supabase
+          .from('users')
+          .update({ has_seen_welcome: true })
+          .eq('id', user.id)
+        
+        if (error) throw error
+      }
+      // Si no tiene id, es un usuario nuevo que aún no está en BD
+      // Solo avanzamos al siguiente step, se creará más adelante
       
       // Ir al siguiente paso (user-data para completar datos personales)
       setCurrentStep('user-data')

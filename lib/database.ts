@@ -77,42 +77,6 @@ export async function checkUserExists(email: string): Promise<DBUser | null> {
   }
 }
 
-export async function createUser(userData: {
-  email: string
-  fullName?: string
-  phone?: string
-  documentType?: string
-  documentNumber?: string
-  country?: string
-}): Promise<DBUser | null> {
-  try {
-    console.log("Creating new user:", userData.email)
-
-    const { data: newUser, error } = await supabase
-      .from("users")
-      .insert({
-        email: userData.email,
-        full_name: userData.fullName || null,
-        phone: userData.phone || null,
-        document_type: userData.documentType || null,
-        document_number: userData.documentNumber || null,
-        country: userData.country || null,
-      })
-      .select()
-      .maybeSingle()
-
-    if (error) {
-      console.error("Error creating user:", error)
-      return null
-    }
-
-    return newUser
-  } catch (error) {
-    console.error("Error in createUser:", error)
-    return null
-  }
-}
-
 export async function updateUser(email: string, userData: {
   fullName?: string
   phone?: string
