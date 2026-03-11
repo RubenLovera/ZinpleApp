@@ -104,7 +104,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (operationMode === "send") {
       const sendFlow: Record<string, string> = {
         "calculator": "email",
-        "email": isUserExisting ? "user-data" : "welcome",
+        "email": isUserExisting ? "user-data" : user?.profile_completed ? "user-data" : "welcome",
         "welcome": "user-data",
         "user-data": "beneficiary-data",
         "beneficiary-data": "summary",
@@ -117,7 +117,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (operationMode === "receive") {
       const receiveFlow: Record<string, string> = {
         "calculator": "email",
-        "email": isUserExisting ? "sender-data" : "welcome",
+        "email": isUserExisting ? "sender-data" : user?.profile_completed ? "user-data" : "welcome",
         "welcome": "user-data",
         "user-data": "destination-data",
         "destination-data": "sender-data",
@@ -131,7 +131,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (operationMode === "buy_usdt") {
       const buyFlow: Record<string, string> = {
         "calculator": "email",
-        "email": isUserExisting ? "wallet-data" : "welcome",
+        "email": isUserExisting ? "wallet-data" : user?.profile_completed ? "user-data" : "welcome",
         "welcome": "user-data",
         "user-data": "wallet-data",
         "wallet-data": "summary",
@@ -144,7 +144,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (operationMode === "sell_usdt") {
       const sellFlow: Record<string, string> = {
         "calculator": "email",
-        "email": isUserExisting ? "pagomovil-data" : "welcome",
+        "email": isUserExisting ? "pagomovil-data" : user?.profile_completed ? "user-data" : "welcome",
         "welcome": "user-data",
         "user-data": "pagomovil-data",
         "pagomovol-data": "summary",
@@ -163,7 +163,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       const sendFlowReverse: Record<string, string> = {
         "email": "calculator",
         "welcome": "email",
-        "user-data": isUserExisting ? "email" : "welcome",
+        "user-data": user?.profile_completed || isUserExisting ? "email" : "welcome",
         "beneficiary-data": "user-data",
         "summary": "beneficiary-data",
         "payment": "summary",
@@ -178,7 +178,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         "welcome": "email",
         "user-data": "welcome",
         "destination-data": "user-data",
-        "sender-data": isUserExisting ? "email" : "destination-data",
+        "sender-data": user?.profile_completed || isUserExisting ? "email" : "destination-data",
         "summary": "sender-data",
         "share-link": "summary",
       }
@@ -191,7 +191,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         "email": "calculator",
         "welcome": "email",
         "user-data": "welcome",
-        "wallet-data": isUserExisting ? "email" : "user-data",
+        "wallet-data": user?.profile_completed || isUserExisting ? "email" : "user-data",
         "summary": "wallet-data",
         "payment": "summary",
       }
@@ -204,7 +204,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         "email": "calculator",
         "welcome": "email",
         "user-data": "welcome",
-        "pagomovil-data": isUserExisting ? "email" : "user-data",
+        "pagomovil-data": user?.profile_completed || isUserExisting ? "email" : "user-data",
         "summary": "pagomovil-data",
         "payment": "summary",
       }

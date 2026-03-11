@@ -101,6 +101,7 @@ export interface UserFormData {
   monthlyVolumeExpected: number
   receivesThirdPartyPayments: boolean
   expectedThirdParties: number
+  profile_completed?: boolean // Flag para rastrear si el perfil fue completado al menos una vez
   // Datos de pago según método
   zelleAccount?: string
   walletAddress?: string
