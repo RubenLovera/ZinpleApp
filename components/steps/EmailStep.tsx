@@ -37,7 +37,7 @@ export default function EmailStep() {
       if (existingUser) {
         // Usuario existente - guardar con el id
         setIsUserExisting(true)
-        setUser({
+        const existingUserData = {
           id: existingUser.id,
           email: existingUser.email,
           fullName: existingUser.full_name,
@@ -55,7 +55,9 @@ export default function EmailStep() {
                 accountHolder: existingUser.pagomovil_account_holder || "",
               }
             : undefined,
-        })
+        }
+        console.log('[v0] USER DATA (existing):', JSON.stringify(existingUserData))
+        setUser(existingUserData)
       } else {
         // Usuario nuevo - crear en BD y guardar con el id retornado
         setIsUserExisting(false)
@@ -74,10 +76,12 @@ export default function EmailStep() {
         
         if (createdUser) {
           // Guardar con el id del usuario creado
-          setUser({
+          const newUserWithId = {
             id: createdUser.id,
             ...newUserData,
-          })
+          }
+          console.log('[v0] USER DATA (new):', JSON.stringify(newUserWithId))
+          setUser(newUserWithId)
         } else {
           throw new Error("No se pudo crear el usuario en la base de datos")
         }
