@@ -93,6 +93,7 @@ export interface QuoteData {
 
 // Datos del formulario de usuario
 export interface UserFormData {
+  id?: string
   email: string
   fullName: string
   phone: string
