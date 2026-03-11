@@ -37,8 +37,8 @@ export default function WelcomeStep() {
       
       if (error) throw error
       
-      // Ir al flujo de órdenes (email para completar la operación)
-      setCurrentStep('email')
+      // Ir al siguiente paso (user-data para completar datos personales)
+      setCurrentStep('user-data')
     } catch (err) {
       console.error('Error marking welcome as seen:', err)
     } finally {

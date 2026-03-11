@@ -70,12 +70,12 @@ export default function EmailStep() {
         setUser(newUser)
       }
 
-      // Siempre ir a payment-type (tanto para USDT como Bolívares)
-      // Pero si es un usuario nuevo, primero ir a welcome
+      // Si es usuario nuevo, ir a welcome
+      // Si es existente, ir directamente a user-data (o al siguiente paso según operationMode)
       if (!existingUser) {
         setCurrentStep("welcome")
       } else {
-        setCurrentStep("payment-type")
+        setCurrentStep("user-data")
       }
     } catch (error) {
       console.error("Error checking user:", error)
