@@ -250,7 +250,7 @@ export default function MultiCurrencyCalculator() {
       fee: currentFee,
     })
 
-    setCurrentStep("terms")
+    setCurrentStep("email")
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
