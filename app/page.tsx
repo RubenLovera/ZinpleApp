@@ -2,9 +2,7 @@
 import { FlowProvider } from "@/contexts/FlowContext"
 import LandingPage from "@/components/LandingPage"
 import EmailStep from "@/components/steps/EmailStep"
-import PaymentTypeStep from "@/components/steps/PaymentTypeStep"
 import UserDataStep from "@/components/steps/UserDataStep"
-import TermsStep from "@/components/steps/TermsStep"
 import ThirdPartyDataStep from "@/components/steps/ThirdPartyDataStep"
 import WalletDataStep from "@/components/steps/WalletDataStep"
 import PagomovileDataStep from "@/components/steps/PagomovileDataStep"
@@ -32,12 +30,8 @@ function FlowContent() {
       return <WelcomeStep />
     case "email":
       return <EmailStep />
-    case "payment-type":
-      return <PaymentTypeStep />
     case "user-data":
       return <UserDataStep />
-    case "terms":
-      return <TermsStep />
     case "third-party-data":
       return <ThirdPartyDataStep />
     case "wallet-data":

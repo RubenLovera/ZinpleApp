@@ -103,14 +103,116 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     // Flujo para ENVIAR A VENEZUELA (send)
     if (operationMode === "send") {
       const sendFlow: Record<string, string> = {
-        "calculator": "terms",
-        "terms": "email",
-        "email": "payment-type",
-        "payment-type": isUserExisting ? "beneficiary-data" : "user-data",
+        "calculator": "email",
+        "email": isUserExisting ? "user-data" : "welcome",
+        "welcome": "user-data",
         "user-data": "beneficiary-data",
         "beneficiary-data": "summary",
         "summary": "payment",
       }
+      return sendFlow[currentStep] || "calculator"
+    }
+
+    // Flujo para RECIBIR EN VENEZUELA (receive)
+    if (operationMode === "receive") {
+      const receiveFlow: Record<string, string> = {
+        "calculator": "email",
+        "email": isUserExisting ? "sender-data" : "welcome",
+        "welcome": "user-data",
+        "user-data": "destination-data",
+        "destination-data": "sender-data",
+        "sender-data": "summary",
+        "summary": "share-link",
+      }
+      return receiveFlow[currentStep] || "calculator"
+    }
+
+    // Flujo para COMPRAR USDT (buy_usdt)
+    if (operationMode === "buy_usdt") {
+      const buyFlow: Record<string, string> = {
+        "calculator": "email",
+        "email": isUserExisting ? "wallet-data" : "welcome",
+        "welcome": "user-data",
+        "user-data": "wallet-data",
+        "wallet-data": "summary",
+        "summary": "payment",
+      }
+      return buyFlow[currentStep] || "calculator"
+    }
+
+    // Flujo para VENDER USDT (sell_usdt)
+    if (operationMode === "sell_usdt") {
+      const sellFlow: Record<string, string> = {
+        "calculator": "email",
+        "email": isUserExisting ? "pagomovil-data" : "welcome",
+        "welcome": "user-data",
+        "user-data": "pagomovil-data",
+        "pagomovol-data": "summary",
+        "summary": "payment",
+      }
+      return sellFlow[currentStep] || "calculator"
+    }
+
+    // Flujo por defecto (legacy)
+    return "calculator"
+  }
+
+  const getPreviousStep = (currentStep: string): string => {
+    // Flujo para ENVIAR A VENEZUELA (send)
+    if (operationMode === "send") {
+      const sendFlowReverse: Record<string, string> = {
+        "email": "calculator",
+        "welcome": "email",
+        "user-data": isUserExisting ? "email" : "welcome",
+        "beneficiary-data": "user-data",
+        "summary": "beneficiary-data",
+        "payment": "summary",
+      }
+      return sendFlowReverse[currentStep] || "calculator"
+    }
+
+    // Flujo para RECIBIR EN VENEZUELA (receive)
+    if (operationMode === "receive") {
+      const receiveFlowReverse: Record<string, string> = {
+        "email": "calculator",
+        "welcome": "email",
+        "user-data": "welcome",
+        "destination-data": "user-data",
+        "sender-data": isUserExisting ? "email" : "destination-data",
+        "summary": "sender-data",
+        "share-link": "summary",
+      }
+      return receiveFlowReverse[currentStep] || "calculator"
+    }
+
+    // Flujo para COMPRAR USDT (buy_usdt)
+    if (operationMode === "buy_usdt") {
+      const buyFlowReverse: Record<string, string> = {
+        "email": "calculator",
+        "welcome": "email",
+        "user-data": "welcome",
+        "wallet-data": isUserExisting ? "email" : "user-data",
+        "summary": "wallet-data",
+        "payment": "summary",
+      }
+      return buyFlowReverse[currentStep] || "calculator"
+    }
+
+    // Flujo para VENDER USDT (sell_usdt)
+    if (operationMode === "sell_usdt") {
+      const sellFlowReverse: Record<string, string> = {
+        "email": "calculator",
+        "welcome": "email",
+        "user-data": "welcome",
+        "pagomovil-data": isUserExisting ? "email" : "user-data",
+        "summary": "pagomovil-data",
+        "payment": "summary",
+      }
+      return sellFlowReverse[currentStep] || "calculator"
+    }
+
+    return "calculator"
+  }
       return sendFlow[currentStep] || "calculator"
     }
 
