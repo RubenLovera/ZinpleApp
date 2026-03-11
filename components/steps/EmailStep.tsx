@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
 import { checkUserExists } from "@/lib/database"
-import { sendOperationEmail } from "@/lib/operation-emails"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -57,7 +56,7 @@ export default function EmailStep() {
             : undefined,
         })
       } else {
-        // Usuario nuevo - enviar welcome email
+        // Usuario nuevo
         setIsUserExisting(false)
         const newUser = {
           email,
@@ -69,30 +68,15 @@ export default function EmailStep() {
           expectedThirdParties: 0,
         }
         setUser(newUser)
-
-        // Enviar welcome email de forma asíncrona (sin bloquear el flujo)
-        // Solo enviar si quote existe
-        if (quote) {
-          try {
-            await sendOperationEmail("welcome", email, {
-              operationId: "welcome",
-              operationType: "welcome",
-              user: newUser,
-              quote,
-              operation: {} as any,
-            })
-            console.log("[v0] Welcome email sent to:", email)
-          } catch (emailError) {
-            console.error("[v0] Error sending welcome email:", emailError)
-            // No bloquear el flujo si el email falla
-          }
-        } else {
-          console.log("[v0] Welcome email not sent - quote is missing")
-        }
       }
 
       // Siempre ir a payment-type (tanto para USDT como Bolívares)
-      setCurrentStep("payment-type")
+      // Pero si es un usuario nuevo, primero ir a welcome
+      if (!existingUser) {
+        setCurrentStep("welcome")
+      } else {
+        setCurrentStep("payment-type")
+      }
     } catch (error) {
       console.error("Error checking user:", error)
       setError("Error al verificar el usuario. Intenta de nuevo.")

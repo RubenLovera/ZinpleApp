@@ -12,6 +12,7 @@ import SummaryStep from "@/components/steps/SummaryStep"
 import PaymentStep from "@/components/steps/PaymentStep"
 import RegisterStep from "@/components/steps/RegisterStep"
 import LoginStep from "@/components/steps/LoginStep"
+import WelcomeStep from "@/components/steps/WelcomeStep"
 import BeneficiaryDataStep from "@/components/steps/BeneficiaryDataStep"
 import SenderDataStep from "@/components/steps/SenderDataStep"
 import DestinationDataStep from "@/components/steps/DestinationDataStep"
@@ -27,6 +28,8 @@ function FlowContent() {
       return <RegisterStep />
     case "login":
       return <LoginStep />
+    case "welcome":
+      return <WelcomeStep />
     case "email":
       return <EmailStep />
     case "payment-type":

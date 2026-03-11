@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
 import MaintenanceBanner from "@/components/MaintenanceBanner"
+import { supabase } from "@/lib/supabase"
 
 export default function LoginStep() {
   const { setQuote, setCurrentStep, setFlowType, resetFlow } = useFlow()
@@ -84,11 +85,42 @@ export default function LoginStep() {
     }
   }, [amount, currency])
 
-  const handleStartOperation = () => {
+  const handleStartOperation = async () => {
     if (result === 0) return
 
-    // Mostrar banner de mantenimiento en lugar de continuar
-    setShowMaintenanceBanner(true)
+    // Verificar si el usuario ha visto la pantalla de bienvenida
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      
+      if (authUser) {
+        // Obtener datos del usuario para verificar has_seen_welcome
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('has_seen_welcome')
+          .eq('id', authUser.id)
+          .single()
+        
+        if (error) {
+          console.error('Error fetching user:', error)
+          setShowMaintenanceBanner(true)
+          return
+        }
+
+        // Si el usuario no ha visto la bienvenida, mostrarla primero
+        if (userData && !userData.has_seen_welcome) {
+          setCurrentStep('welcome')
+        } else {
+          // Si ya la vio, ir directamente a la calculadora
+          setCurrentStep('calculator')
+        }
+      } else {
+        // No hay usuario autenticado, mostrar mantenimiento
+        setShowMaintenanceBanner(true)
+      }
+    } catch (err) {
+      console.error('Error in login:', err)
+      setShowMaintenanceBanner(true)
+    }
   }
 
   // Soporte para ENTER
