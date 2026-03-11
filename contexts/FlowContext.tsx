@@ -214,20 +214,6 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     return "calculator"
   }
 
-  const getPreviousStep = (currentStep: string): string => {
-        "terms": "calculator",
-        "email": "terms",
-        "user-data": "email",
-        "pagomovil-data": isUserExisting ? "email" : "user-data",
-        "summary": "pagomovil-data",
-        "payment": "summary",
-      }
-      return sellFlowReverse[currentStep] || "calculator"
-    }
-
-    return "calculator"
-  }
-
   return (
     <FlowContext.Provider
       value={{
