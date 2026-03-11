@@ -25,22 +25,28 @@ export default function WelcomeStep() {
   }
 
   const handleContinue = async () => {
-    if (!user) return
-    
     setLoading(true)
     try {
+      // Obtener el usuario directamente de la sesión de Supabase
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !authUser) {
+        throw new Error('No hay usuario autenticado. Por favor, inicia sesión.')
+      }
+
       // Marcar que el usuario ya vio la pantalla de bienvenida
       const { error } = await supabase
         .from('users')
         .update({ has_seen_welcome: true })
-        .eq('id', user.id)
+        .eq('id', authUser.id)
       
       if (error) throw error
       
       // Ir al siguiente paso (user-data para completar datos personales)
       setCurrentStep('user-data')
     } catch (err) {
-      console.error('Error marking welcome as seen:', err)
+      console.error('Error en handleContinue:', err)
+      alert(`Error: ${err instanceof Error ? err.message : 'No se pudo continuar'}`)
     } finally {
       setLoading(false)
     }
