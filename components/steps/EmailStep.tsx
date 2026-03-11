@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
-import { checkUserExists, createUser } from "@/lib/database"
+import { checkUserExists } from "@/lib/database"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -59,7 +59,8 @@ export default function EmailStep() {
         console.log('[v0] USER DATA (existing):', JSON.stringify(existingUserData))
         setUser(existingUserData)
       } else {
-        // Usuario nuevo - crear en BD y guardar con el id retornado
+        // Usuario nuevo - guardar solo el email en el contexto sin crear en BD
+        // El usuario se creará más adelante en un API route del servidor con permisos
         setIsUserExisting(false)
         const newUserData = {
           email,
@@ -70,21 +71,8 @@ export default function EmailStep() {
           receivesThirdPartyPayments: false,
           expectedThirdParties: 0,
         }
-        
-        // Crear el usuario en la base de datos
-        const createdUser = await createUser(email)
-        
-        if (createdUser) {
-          // Guardar con el id del usuario creado
-          const newUserWithId = {
-            id: createdUser.id,
-            ...newUserData,
-          }
-          console.log('[v0] USER DATA (new):', JSON.stringify(newUserWithId))
-          setUser(newUserWithId)
-        } else {
-          throw new Error("No se pudo crear el usuario en la base de datos")
-        }
+        console.log('[v0] USER DATA (new):', JSON.stringify(newUserData))
+        setUser(newUserData)
       }
 
       // Si es usuario nuevo, ir a welcome
