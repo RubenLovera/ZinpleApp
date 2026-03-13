@@ -167,7 +167,12 @@ export default function UserDataStep() {
     // Simular guardado (aquí podrías hacer una llamada a la API para actualizar el usuario)
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    setUser(formData)
+    // Marcar perfil como completado
+    const updatedFormData = {
+      ...formData,
+      profile_completed: true,
+    }
+    setUser(updatedFormData)
     setIsSaving(false)
 
     // Determinar a dónde ir después
