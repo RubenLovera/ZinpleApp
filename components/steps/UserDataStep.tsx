@@ -369,11 +369,11 @@ export default function UserDataStep() {
                 <div className="relative mt-1">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
                   <Select
-                    value={getVolumeRangeFromNumber(formData.monthlyVolumeExpected || 0)}
+                    value={getVolumeRangeFromNumber(formData.monthlyVolumeExpected || 99)}
                     onValueChange={(value) => handleInputChange("monthlyVolumeExpected", value)}
                   >
                     <SelectTrigger className="pl-10 cursor-pointer">
-                      <SelectValue placeholder="$10 - $99 USD" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {volumeRanges.map((range) => (
