@@ -12,6 +12,7 @@ import RegisterStep from "@/components/steps/RegisterStep"
 import LoginStep from "@/components/steps/LoginStep"
 import WelcomeStep from "@/components/steps/WelcomeStep"
 import BeneficiaryDataStep from "@/components/steps/BeneficiaryDataStep"
+import BeneficiaryDashboardStep from "@/components/steps/BeneficiaryDashboardStep"
 import SenderDataStep from "@/components/steps/SenderDataStep"
 import DestinationDataStep from "@/components/steps/DestinationDataStep"
 import { useFlow } from "@/contexts/FlowContext"
@@ -40,6 +41,8 @@ function FlowContent() {
       return <PagomovileDataStep />
     case "beneficiary-data":
       return <BeneficiaryDataStep />
+    case "beneficiary-dashboard":
+      return <BeneficiaryDashboardStep />
     case "sender-data":
       return <SenderDataStep />
     case "destination-data":
