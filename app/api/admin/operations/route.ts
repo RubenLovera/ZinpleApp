@@ -92,9 +92,12 @@ export async function PATCH(request: NextRequest) {
     // Determinar nuevo estado según la acción
     let newStatus: string
     const validTransitions: Record<string, string[]> = {
+      pending: ["awaiting_payment", "processing", "completed", "cancelled"],
+      awaiting_payment: ["processing", "completed", "cancelled"],
+      processing: ["completed", "cancelled"],
+      completed: [],
+      cancelled: ["pending"],
       in_progress: ["completed", "cancelled"],
-      completed: [], // No se puede cambiar desde completado
-      cancelled: ["in_progress"], // Solo revivir puede cambiar desde cancelado
     }
 
     switch (action) {
