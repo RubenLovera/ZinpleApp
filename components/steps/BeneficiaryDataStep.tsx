@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Smartphone, Building } from "lucide-react"
+import { ArrowLeft, Smartphone, Building, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,28 @@ import { useFlow } from "@/contexts/FlowContext"
 import type { BeneficiaryData } from "@/types/database"
 import ProgressBar from "@/components/ProgressBar"
 import { getCurrencyInfo } from "@/types/database"
+
+// Datos de países con códigos telefónicos (mismo que en UserDataStep)
+const countries = [
+  { code: "+1-US", name: "Estados Unidos", flag: "🇺🇸", displayCode: "+1 (US)" },
+  { code: "+1-CA", name: "Canadá", flag: "🇨🇦", displayCode: "+1 (CA)" },
+  { code: "+52", name: "México", flag: "🇲🇽", displayCode: "+52" },
+  { code: "+57", name: "Colombia", flag: "🇨🇴", displayCode: "+57" },
+  { code: "+58", name: "Venezuela", flag: "🇻🇪", displayCode: "+58" },
+  { code: "+51", name: "Perú", flag: "🇵🇪", displayCode: "+51" },
+  { code: "+56", name: "Chile", flag: "🇨🇱", displayCode: "+56" },
+  { code: "+54", name: "Argentina", flag: "🇦🇷", displayCode: "+54" },
+  { code: "+55", name: "Brasil", flag: "🇧🇷", displayCode: "+55" },
+  { code: "+593", name: "Ecuador", flag: "🇪🇨", displayCode: "+593" },
+  { code: "+595", name: "Paraguay", flag: "🇵🇾", displayCode: "+595" },
+  { code: "+598", name: "Uruguay", flag: "🇺🇾", displayCode: "+598" },
+  { code: "+591", name: "Bolivia", flag: "🇧🇴", displayCode: "+591" },
+  { code: "+34", name: "España", flag: "🇪🇸", displayCode: "+34" },
+  { code: "+39", name: "Italia", flag: "🇮🇹", displayCode: "+39" },
+  { code: "+33", name: "Francia", flag: "🇫🇷", displayCode: "+33" },
+  { code: "+49", name: "Alemania", flag: "🇩🇪", displayCode: "+49" },
+  { code: "+44", name: "Reino Unido", flag: "🇬🇧", displayCode: "+44" },
+]
 
 // Bancos de Venezuela
 const venezuelaBanks = [
@@ -35,14 +57,6 @@ const venezuelaBanks = [
   { value: "agricola", label: "Banco Agrícola" },
 ]
 
-const relationships = [
-  { value: "familiar", label: "Familiar" },
-  { value: "amigo", label: "Amigo" },
-  { value: "cliente", label: "Cliente" },
-  { value: "proveedor", label: "Proveedor" },
-  { value: "otro", label: "Otro" },
-]
-
 export default function BeneficiaryDataStep() {
   const { quote, beneficiary, setBeneficiary, setCurrentStep, getNextStep, getPreviousStep, user } = useFlow()
   const [formData, setFormData] = useState<BeneficiaryData>(
@@ -59,6 +73,8 @@ export default function BeneficiaryDataStep() {
       },
     }
   )
+  const [countryCode, setCountryCode] = useState("+58") // Venezuela por defecto
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [cedulaType, setCedulaType] = useState<"V" | "E" | "J">("V")
   const [cedulaNumber, setCedulaNumber] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -81,43 +97,44 @@ export default function BeneficiaryDataStep() {
     setCurrentStep(getPreviousStep("beneficiary-data"))
   }
 
-  const handlePagomovilChange = (field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      pagomovil: {
-        ...prev.pagomovil!,
-        [field]: value,
-      },
-    }))
-  }
-
   const handleCedulaChange = (value: string) => {
     if (value === "" || /^\d+$/.test(value)) {
       setCedulaNumber(value)
       const fullCedula = value ? `${cedulaType}-${value}` : ""
-      handlePagomovilChange("cedula", fullCedula)
+      setFormData((prev) => ({
+        ...prev,
+        pagomovil: {
+          ...prev.pagomovil!,
+          cedula: fullCedula,
+        },
+      }))
     }
   }
 
   const handleCedulaTypeChange = (type: "V" | "E" | "J") => {
     setCedulaType(type)
     const fullCedula = cedulaNumber ? `${type}-${cedulaNumber}` : ""
-    handlePagomovilChange("cedula", fullCedula)
+    setFormData((prev) => ({
+      ...prev,
+      pagomovil: {
+        ...prev.pagomovil!,
+        cedula: fullCedula,
+      },
+    }))
   }
 
   const handlePhoneChange = (value: string) => {
     if (value === "" || /^\d+$/.test(value)) {
-      handlePagomovilChange("phone", value)
+      setPhoneNumber(value)
     }
   }
 
   const isFormValid = () => {
     return (
       formData.fullName.trim() !== "" &&
-      formData.pagomovil?.phone.trim() !== "" &&
+      phoneNumber.trim() !== "" &&
       formData.pagomovil?.bank.trim() !== "" &&
-      formData.pagomovil?.cedula.trim() !== "" &&
-      formData.relationship
+      formData.pagomovil?.cedula.trim() !== ""
     )
   }
 
@@ -128,21 +145,35 @@ export default function BeneficiaryDataStep() {
     setError("")
 
     try {
+      // Construir objeto beneficiary para contexto
+      const updatedBeneficiary: BeneficiaryData = {
+        ...formData,
+        fullName: formData.fullName,
+        pagomovil: {
+          phone: phoneNumber,
+          bank: formData.pagomovil?.bank || "",
+          accountHolder: formData.fullName, // Usar nombre completo como titular
+          cedula: formData.pagomovil?.cedula || "",
+        },
+      }
+
       // Guardar en contexto
-      setBeneficiary(formData)
+      setBeneficiary(updatedBeneficiary)
 
       // Guardar en Supabase si el usuario tiene ID
       if (user?.id) {
+        const bankOption = venezuelaBanks.find((b) => b.value === formData.pagomovil?.bank)
         const response = await fetch("/api/beneficiaries/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: user.id,
             fullName: formData.fullName,
-            pagomovilPhone: formData.pagomovil?.phone,
+            pagomovilPhone: phoneNumber,
+            countryCode: countryCode,
             bank: formData.pagomovil?.bank,
+            bankName: bankOption?.label || formData.pagomovil?.bank,
             cedula: formData.pagomovil?.cedula,
-            relationship: formData.relationship,
           }),
         })
 
@@ -210,24 +241,36 @@ export default function BeneficiaryDataStep() {
                 />
               </div>
 
-              {/* Número de Pago Móvil */}
+              {/* Número de Teléfono con selector de país */}
               <div>
-                <Label htmlFor="pagomovilPhone">Número de Pago Móvil *</Label>
+                <Label>Número de Teléfono *</Label>
                 <div className="flex gap-2 mt-1">
-                  <div className="w-16 flex items-center justify-center bg-gray-100 rounded-md border text-sm">
-                    0
-                  </div>
+                  {/* Selector de país */}
+                  <Select value={countryCode} onValueChange={setCountryCode}>
+                    <SelectTrigger className="w-40 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {countries.map((country) => (
+                        <SelectItem key={country.code} value={country.code} className="cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <span>{country.flag}</span>
+                            <span>{country.displayCode}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Input de número */}
                   <Input
-                    id="pagomovilPhone"
                     type="text"
                     placeholder="4141234567"
-                    value={formData.pagomovil?.phone || ""}
+                    value={phoneNumber}
                     onChange={(e) => handlePhoneChange(e.target.value)}
-                    maxLength={10}
                     className="flex-1"
                   />
                 </div>
-                <p className="text-sm text-gray-500 mt-1">Número asociado al Pago Móvil (sin el 0 inicial)</p>
+                <p className="text-sm text-gray-500 mt-1">Número sin espacios ni caracteres especiales</p>
               </div>
 
               {/* Banco */}
@@ -235,7 +278,15 @@ export default function BeneficiaryDataStep() {
                 <Label htmlFor="bank">Banco *</Label>
                 <Select
                   value={formData.pagomovil?.bank || ""}
-                  onValueChange={(value) => handlePagomovilChange("bank", value)}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      pagomovil: {
+                        ...prev.pagomovil!,
+                        bank: value,
+                      },
+                    }))
+                  }
                 >
                   <SelectTrigger className="mt-1 cursor-pointer">
                     <SelectValue placeholder="Selecciona el banco" />
@@ -276,28 +327,6 @@ export default function BeneficiaryDataStep() {
                     className="flex-1"
                   />
                 </div>
-              </div>
-
-              {/* Relación con el beneficiario */}
-              <div>
-                <Label htmlFor="relationship">Relación con el Beneficiario *</Label>
-                <Select
-                  value={formData.relationship}
-                  onValueChange={(value: "familiar" | "amigo" | "cliente" | "proveedor" | "otro") => 
-                    setFormData({ ...formData, relationship: value })
-                  }
-                >
-                  <SelectTrigger className="mt-1 cursor-pointer">
-                    <SelectValue placeholder="Selecciona la relación" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {relationships.map((rel) => (
-                      <SelectItem key={rel.value} value={rel.value} className="cursor-pointer">
-                        {rel.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </CardContent>
           </Card>
