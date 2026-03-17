@@ -59,17 +59,14 @@ export interface DBOperation {
 
 export async function checkUserExists(email: string): Promise<DBUser | null> {
   try {
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .maybeSingle()
+    const response = await fetch(`/api/users/check?email=${encodeURIComponent(email)}`)
 
-    if (error && error.code !== "PGRST116") {
-      console.error("Error checking user:", error)
+    if (!response.ok) {
+      console.error("Error checking user:", response.statusText)
       return null
     }
 
+    const { user } = await response.json()
     return user
   } catch (error) {
     console.error("Error in checkUserExists:", error)
