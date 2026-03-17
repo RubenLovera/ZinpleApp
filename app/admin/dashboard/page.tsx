@@ -58,10 +58,13 @@ import {
   Save,
   X,
   GripVertical,
+  Copy,
+  Check,
 } from "lucide-react"
 import UsersList from "@/components/admin/UsersList"
 import UserProfile from "@/components/admin/UserProfile"
 import AdminHeader from "@/components/admin/AdminHeader"
+import CopyButton from "@/components/CopyButton"
 
 interface Stats {
   byStatus: {
@@ -1033,12 +1036,61 @@ export default function AdminDashboard() {
                     </div>
 
                     {selectedOperation.beneficiary_full_name && (
-                      <div className="border-t pt-4">
-                        <Label className="text-muted-foreground">Beneficiario</Label>
-                        <p className="font-semibold">{selectedOperation.beneficiary_full_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedOperation.beneficiary_phone} - {selectedOperation.beneficiary_bank_name}
-                        </p>
+                      <div className="border-t pt-4 space-y-3">
+                        <Label className="text-muted-foreground">Datos del Destinatario</Label>
+                        
+                        {/* Full Name */}
+                        <div className="flex items-center justify-between bg-muted p-2 rounded">
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">Nombre Completo</p>
+                            <p className="font-semibold">{selectedOperation.beneficiary_full_name}</p>
+                          </div>
+                          <CopyButton text={selectedOperation.beneficiary_full_name} />
+                        </div>
+
+                        {/* Phone */}
+                        {selectedOperation.beneficiary_phone && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Teléfono</p>
+                              <p className="font-semibold">{selectedOperation.beneficiary_phone}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_phone} />
+                          </div>
+                        )}
+
+                        {/* Bank */}
+                        {selectedOperation.beneficiary_bank_name && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Banco</p>
+                              <p className="font-semibold">{selectedOperation.beneficiary_bank_name}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_bank_name} />
+                          </div>
+                        )}
+
+                        {/* Document */}
+                        {selectedOperation.beneficiary_document && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Documento</p>
+                              <p className="font-semibold">{selectedOperation.beneficiary_document}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_document} />
+                          </div>
+                        )}
+
+                        {/* Wallet Address */}
+                        {selectedOperation.beneficiary_wallet_address && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Wallet (Polygon)</p>
+                              <p className="font-semibold break-all text-sm">{selectedOperation.beneficiary_wallet_address}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_wallet_address} />
+                          </div>
+                        )}
                       </div>
                     )}
 
