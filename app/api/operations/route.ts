@@ -200,6 +200,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Error creando operación: ${operationError.message}` }, { status: 500 })
     }
 
+    // 2.5 Guardar el beneficiario en la tabla beneficiaries si aplica
+    if (beneficiary && dbUser?.id && destination) {
+      const { error: beneficiaryError } = await supabaseAdmin
+        .from("beneficiaries")
+        .insert({
+          user_id: dbUser.id,
+          full_name: beneficiary.fullName,
+          pagomovil_phone: destination.phone || beneficiary.phone || null,
+          pagomovil_bank: beneficiary.bankCode || destination.bankCode || null,
+          pagomovil_cedula: destination.document || null,
+          relationship: "otro",
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .maybeSingle()
+
+      if (beneficiaryError) {
+        // Log pero no fallar la operación si hay error al guardar beneficiario
+        console.warn("[v0] Warning: Could not save beneficiary:", beneficiaryError)
+      } else {
+        console.log("[v0] Beneficiary saved successfully during operation creation")
+      }
+    }
+
     // 3. Registrar en operation_logs
     await supabaseAdmin.from("operation_logs").insert({
       operation_id: operation.id,
