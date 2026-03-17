@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
 import { checkUserExists } from "@/lib/database"
+import { supabase } from "@/lib/supabase"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -76,11 +77,24 @@ export default function EmailStep() {
       }
 
       // Si es usuario nuevo, ir a welcome
-      // Si es existente, ir directamente a user-data (o al siguiente paso según operationMode)
+      // Si es existente, verificar si tiene beneficiarios guardados
       if (!existingUser) {
         setCurrentStep("welcome")
       } else {
-        setCurrentStep("user-data")
+        // Verificar si el usuario existente tiene beneficiarios guardados
+        const { data: beneficiaries } = await supabase
+          .from("beneficiaries")
+          .select("id")
+          .eq("user_id", existingUser.id)
+          .limit(1)
+
+        if (beneficiaries && beneficiaries.length > 0) {
+          // Tiene beneficiarios guardados, ir al dashboard
+          setCurrentStep("beneficiary-dashboard")
+        } else {
+          // No tiene beneficiarios, ir directamente a user-data
+          setCurrentStep("user-data")
+        }
       }
     } catch (error) {
       console.error("Error checking user:", error)
