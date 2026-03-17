@@ -1044,25 +1044,33 @@ export default function AdminDashboard() {
 
                     {/* Actions */}
                     <div className="border-t pt-4 flex flex-wrap gap-2">
-                      {selectedOperation.status === "in_progress" && (
+                      {selectedOperation.status !== "completed" && selectedOperation.status !== "cancelled" && (
                         <>
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => handleOperationAction("complete")}
+                            onClick={() => {
+                              if (window.confirm("¿Estás seguro de que deseas finalizar esta orden?")) {
+                                handleOperationAction("complete")
+                              }
+                            }}
                             disabled={actionLoading}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
-                            Completar
+                            Finalizar orden
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => handleOperationAction("cancel")}
+                            onClick={() => {
+                              if (window.confirm("¿Estás seguro de que deseas cancelar esta orden?")) {
+                                handleOperationAction("cancel")
+                              }
+                            }}
                             disabled={actionLoading}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
+                            Cancelar orden
                           </Button>
                         </>
                       )}
