@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Plus, Smartphone, Building, User, Phone } from "lucide-react"
+import { ArrowLeft, Plus, Smartphone, Building, User, Phone, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
@@ -18,6 +18,7 @@ export default function BeneficiaryDashboardStep() {
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Cargar beneficiarios del usuario
   useEffect(() => {
@@ -106,6 +107,37 @@ export default function BeneficiaryDashboardStep() {
     setCurrentStep("beneficiary-data")
   }
 
+  const handleEditBeneficiary = (beneficiary: BeneficiaryRecord) => {
+    // Guardar en el contexto y ir al formulario de edición
+    const { id, ...beneficiaryData } = beneficiary
+    setBeneficiary(beneficiaryData)
+    setCurrentStep("beneficiary-data")
+  }
+
+  const handleDeleteBeneficiary = async (id: string) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este destinatario?")) {
+      return
+    }
+
+    try {
+      setDeletingId(id)
+      const { error } = await supabase.from("beneficiaries").delete().eq("id", id)
+
+      if (error) {
+        setError("Error al eliminar el destinatario")
+        return
+      }
+
+      // Remover del estado local
+      setBeneficiaries(beneficiaries.filter((b) => b.id !== id))
+    } catch (err) {
+      console.error("[v0] Error deleting beneficiary:", err)
+      setError("Error inesperado al eliminar")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 sm:p-6">
@@ -159,11 +191,11 @@ export default function BeneficiaryDashboardStep() {
               {beneficiaries.map((beneficiary) => (
                 <Card
                   key={beneficiary.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-primary"
+                  className="hover:shadow-lg transition-shadow border-l-4 border-l-primary"
                 >
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
+                      <div className="flex-1 cursor-pointer" onClick={() => handleSelectBeneficiary(beneficiary)}>
                         {/* Nombre y relación */}
                         <div className="mb-3">
                           <h3 className="text-lg font-semibold text-gray-900">{beneficiary.fullName}</h3>
@@ -224,13 +256,34 @@ export default function BeneficiaryDashboardStep() {
                         )}
                       </div>
 
-                      {/* Botón de selección */}
-                      <Button
-                        onClick={() => handleSelectBeneficiary(beneficiary)}
-                        className="mt-2 bg-primary hover:bg-primary/90 whitespace-nowrap"
-                      >
-                        Seleccionar
-                      </Button>
+                      {/* Botones de acción */}
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          onClick={() => handleSelectBeneficiary(beneficiary)}
+                          className="bg-primary hover:bg-primary/90 whitespace-nowrap"
+                        >
+                          Seleccionar
+                        </Button>
+                        <Button
+                          onClick={() => handleEditBeneficiary(beneficiary)}
+                          variant="outline"
+                          size="sm"
+                          className="whitespace-nowrap"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          onClick={() => handleDeleteBeneficiary(beneficiary.id)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 whitespace-nowrap"
+                          disabled={deletingId === beneficiary.id}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          {deletingId === beneficiary.id ? "Eliminando..." : "Eliminar"}
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
