@@ -33,7 +33,9 @@ export default function EmailStep() {
     setError("")
 
     try {
+      console.log('[v0] Email entered:', email)
       const existingUser = await checkUserExists(email)
+      console.log('[v0] checkUserExists result:', JSON.stringify(existingUser))
 
       if (existingUser) {
         // Usuario existente - guardar con el id
