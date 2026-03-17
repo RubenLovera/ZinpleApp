@@ -175,9 +175,9 @@ export default function MultiCurrencyCalculator() {
   const sourceDropdownRef = useRef<HTMLDivElement>(null)
   const destDropdownRef = useRef<HTMLDivElement>(null)
 
-  // Detect mobile
+  // Detect mobile (breakpoint at 1024px to include tablets)
   useEffect(() => {
-    const checkIsMobile = () => setIsMobile(window.innerWidth < 768)
+    const checkIsMobile = () => setIsMobile(window.innerWidth < 1024)
     checkIsMobile()
     window.addEventListener("resize", checkIsMobile)
     return () => window.removeEventListener("resize", checkIsMobile)
@@ -327,27 +327,41 @@ export default function MultiCurrencyCalculator() {
           </div>
         )}
 
-        {/* Mobile/Tablet dropdown */}
-        {isMobile && isOpen && availableCurrenciesList.length > 1 && (
-          <div className="fixed left-4 right-4 mt-2 bg-background border border-border rounded-xl shadow-2xl z-[9999] max-h-[200px] overflow-y-auto" style={{ top: "calc(100% + 0.5rem)", minWidth: "calc(100vw - 2rem)" }}>
-            {availableCurrenciesList.map((code) => {
-              const curr = currencies[code]
-              return (
+        {/* Mobile/Tablet modal - full screen overlay */}
+        {isMobile && isMobileModalOpen && availableCurrenciesList.length > 1 && (
+          <div className="fixed inset-0 bg-black/50 z-[99999] flex items-end">
+            <div className="w-full bg-background rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto">
+              <div className="sticky top-0 bg-background border-b border-border px-4 py-4 flex items-center justify-between rounded-t-2xl">
+                <h2 className="font-semibold text-foreground">Selecciona moneda</h2>
                 <button
-                  key={code}
-                  onClick={() => { onSelect(code); setIsOpen(false) }}
-                  className={`w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 transition-colors text-sm ${
-                    currentValue === code ? "bg-secondary" : ""
-                  }`}
+                  onClick={() => setIsMobileModalOpen(false)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <span className="text-base">{curr?.symbol}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground text-sm">{code}</div>
-                    <div className="text-xs text-muted-foreground truncate">{curr?.country}</div>
-                  </div>
+                  ✕
                 </button>
-              )
-            })}
+              </div>
+              <div className="p-4 space-y-2">
+                {availableCurrenciesList.map((code) => {
+                  const curr = currencies[code]
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => { onSelect(code); setIsMobileModalOpen(false) }}
+                      className={`w-full px-4 py-3 text-left hover:bg-muted rounded-lg flex items-center gap-3 transition-colors ${
+                        currentValue === code ? "bg-secondary" : ""
+                      }`}
+                    >
+                      <span className="text-2xl">{curr?.symbol}</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">{code}</div>
+                        <div className="text-sm text-muted-foreground">{curr?.name}</div>
+                      </div>
+                      {currentValue === code && <span className="text-primary font-semibold">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>
