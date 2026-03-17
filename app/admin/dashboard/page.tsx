@@ -233,14 +233,15 @@ function RateRow({
               onChange={(e) => onEditChange({ ...editRateValues, rate: e.target.value })}
               placeholder="Tasa"
             />
-            <Input
-              type="number"
-              step="0.01"
-              className="w-20"
-              value={editRateValues.fee}
-              onChange={(e) => onEditChange({ ...editRateValues, fee: e.target.value })}
-              placeholder="Fee %"
-            />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="w-20"
+                    value={editRateValues.fee}
+                    onChange={(e) => onEditChange({ ...editRateValues, fee: e.target.value })}
+                    placeholder="Comisión"
+                  />
+                  <span className="text-sm font-medium">%</span>
             <Button size="sm" onClick={onSave} disabled={actionLoading}>
               <Save className="h-4 w-4" />
             </Button>
@@ -473,7 +474,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           rateId,
           rate: parseFloat(editRateValues.rate),
-          feePercentage: parseFloat(editRateValues.fee),
+          feePercentage: parseFloat(editRateValues.fee) / 100,
           adminEmail,
           reason: "Actualización manual desde dashboard",
         }),
@@ -1216,11 +1217,11 @@ export default function AdminDashboard() {
                             editRateValues={editRateValues}
                             actionLoading={actionLoading}
                             onEdit={() => {
-                              setEditingRate(rate.id)
-                              setEditRateValues({
-                                rate: String(rate.rate),
-                                fee: String(rate.fee_percentage),
-                              })
+                setEditingRate(rate.id)
+                setEditRateValues({
+                  rate: String(rate.rate),
+                  fee: String(rate.fee_percentage * 100),
+                })
                             }}
                             onSave={() => handleUpdateRate(rate.id)}
                             onCancel={() => setEditingRate(null)}
