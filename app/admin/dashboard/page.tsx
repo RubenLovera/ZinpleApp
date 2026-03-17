@@ -58,10 +58,13 @@ import {
   Save,
   X,
   GripVertical,
+  Copy,
+  Check,
 } from "lucide-react"
 import UsersList from "@/components/admin/UsersList"
 import UserProfile from "@/components/admin/UserProfile"
 import AdminHeader from "@/components/admin/AdminHeader"
+import CopyButton from "@/components/CopyButton"
 
 interface Stats {
   byStatus: {
@@ -230,14 +233,15 @@ function RateRow({
               onChange={(e) => onEditChange({ ...editRateValues, rate: e.target.value })}
               placeholder="Tasa"
             />
-            <Input
-              type="number"
-              step="0.01"
-              className="w-20"
-              value={editRateValues.fee}
-              onChange={(e) => onEditChange({ ...editRateValues, fee: e.target.value })}
-              placeholder="Fee %"
-            />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="w-20"
+                    value={editRateValues.fee}
+                    onChange={(e) => onEditChange({ ...editRateValues, fee: e.target.value })}
+                    placeholder="Comisión"
+                  />
+                  <span className="text-sm font-medium">%</span>
             <Button size="sm" onClick={onSave} disabled={actionLoading}>
               <Save className="h-4 w-4" />
             </Button>
@@ -470,7 +474,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           rateId,
           rate: parseFloat(editRateValues.rate),
-          feePercentage: parseFloat(editRateValues.fee),
+          feePercentage: parseFloat(editRateValues.fee) / 100,
           adminEmail,
           reason: "Actualización manual desde dashboard",
         }),
@@ -1033,36 +1037,93 @@ export default function AdminDashboard() {
                     </div>
 
                     {selectedOperation.beneficiary_full_name && (
-                      <div className="border-t pt-4">
-                        <Label className="text-muted-foreground">Beneficiario</Label>
-                        <p className="font-semibold">{selectedOperation.beneficiary_full_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedOperation.beneficiary_phone} - {selectedOperation.beneficiary_bank_name}
-                        </p>
+                      <div className="border-t pt-4 space-y-3">
+                        <Label className="text-muted-foreground">Datos del Destinatario</Label>
+                        
+                        {/* Full Name */}
+                        <div className="flex items-center justify-between bg-muted p-2 rounded">
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">Nombre Completo</p>
+                            <p className="font-semibold">{selectedOperation.beneficiary_full_name}</p>
+                          </div>
+                          <CopyButton text={selectedOperation.beneficiary_full_name} />
+                        </div>
+
+                        {/* Phone */}
+                        {selectedOperation.beneficiary_phone && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Teléfono</p>
+                              <p className="font-semibold">{selectedOperation.beneficiary_phone}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_phone} />
+                          </div>
+                        )}
+
+                        {/* Bank */}
+                        {selectedOperation.beneficiary_bank_name && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Banco</p>
+                              <p className="font-semibold">{selectedOperation.beneficiary_bank_name}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_bank_name} />
+                          </div>
+                        )}
+
+                        {/* Document */}
+                        {selectedOperation.beneficiary_document && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Documento</p>
+                              <p className="font-semibold">{selectedOperation.beneficiary_document}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_document} />
+                          </div>
+                        )}
+
+                        {/* Wallet Address */}
+                        {selectedOperation.beneficiary_wallet_address && (
+                          <div className="flex items-center justify-between bg-muted p-2 rounded">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">Wallet (Polygon)</p>
+                              <p className="font-semibold break-all text-sm">{selectedOperation.beneficiary_wallet_address}</p>
+                            </div>
+                            <CopyButton text={selectedOperation.beneficiary_wallet_address} />
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {/* Actions */}
                     <div className="border-t pt-4 flex flex-wrap gap-2">
-                      {selectedOperation.status === "in_progress" && (
+                      {selectedOperation.status !== "completed" && selectedOperation.status !== "cancelled" && (
                         <>
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => handleOperationAction("complete")}
+                            onClick={() => {
+                              if (window.confirm("¿Estás seguro de que deseas finalizar esta orden?")) {
+                                handleOperationAction("complete")
+                              }
+                            }}
                             disabled={actionLoading}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
-                            Completar
+                            Finalizar orden
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => handleOperationAction("cancel")}
+                            onClick={() => {
+                              if (window.confirm("¿Estás seguro de que deseas cancelar esta orden?")) {
+                                handleOperationAction("cancel")
+                              }
+                            }}
                             disabled={actionLoading}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
-                            Cancelar
+                            Cancelar orden
                           </Button>
                         </>
                       )}
@@ -1156,11 +1217,11 @@ export default function AdminDashboard() {
                             editRateValues={editRateValues}
                             actionLoading={actionLoading}
                             onEdit={() => {
-                              setEditingRate(rate.id)
-                              setEditRateValues({
-                                rate: String(rate.rate),
-                                fee: String(rate.fee_percentage),
-                              })
+                setEditingRate(rate.id)
+                setEditRateValues({
+                  rate: String(rate.rate),
+                  fee: String(rate.fee_percentage * 100),
+                })
                             }}
                             onSave={() => handleUpdateRate(rate.id)}
                             onCancel={() => setEditingRate(null)}
