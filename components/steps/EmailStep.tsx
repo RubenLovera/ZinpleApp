@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
 import { checkUserExists } from "@/lib/database"
-import { supabase } from "@/lib/supabase"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -61,6 +60,22 @@ export default function EmailStep() {
         }
         console.log('[v0] USER DATA (existing):', JSON.stringify(existingUserData))
         setUser(existingUserData)
+
+        // Determinar a dónde navegar
+        // Traer hasBeneficiaries y profileComplete del endpoint
+        const response = await fetch(`/api/users/check?email=${encodeURIComponent(email)}`)
+        const { hasBeneficiaries, profileComplete } = await response.json()
+
+        if (hasBeneficiaries) {
+          // Tiene beneficiarios guardados, ir al dashboard
+          setCurrentStep("beneficiary-dashboard")
+        } else if (profileComplete) {
+          // Perfil completo pero sin beneficiarios, ir directo a beneficiary-data para agregar uno
+          setCurrentStep("beneficiary-data")
+        } else {
+          // Perfil incompleto, ir a user-data para completarlo
+          setCurrentStep("user-data")
+        }
       } else {
         // Usuario nuevo - guardar solo el email en el contexto sin crear en BD
         // El usuario se creará más adelante en un API route del servidor con permisos
@@ -76,27 +91,7 @@ export default function EmailStep() {
         }
         console.log('[v0] USER DATA (new):', JSON.stringify(newUserData))
         setUser(newUserData)
-      }
-
-      // Si es usuario nuevo, ir a welcome
-      // Si es existente, verificar si tiene beneficiarios guardados
-      if (!existingUser) {
         setCurrentStep("welcome")
-      } else {
-        // Verificar si el usuario existente tiene beneficiarios guardados
-        const { data: beneficiaries } = await supabase
-          .from("beneficiaries")
-          .select("id")
-          .eq("user_id", existingUser.id)
-          .limit(1)
-
-        if (beneficiaries && beneficiaries.length > 0) {
-          // Tiene beneficiarios guardados, ir al dashboard
-          setCurrentStep("beneficiary-dashboard")
-        } else {
-          // No tiene beneficiarios, ir directamente a user-data
-          setCurrentStep("user-data")
-        }
       }
     } catch (error) {
       console.error("Error checking user:", error)
