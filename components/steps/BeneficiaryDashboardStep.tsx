@@ -5,7 +5,6 @@ import { ArrowLeft, Plus, Smartphone, Building, User, Phone, Edit, Trash2 } from
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlow } from "@/contexts/FlowContext"
-import { supabase } from "@/lib/supabase"
 import type { BeneficiaryData } from "@/types/database"
 import ProgressBar from "@/components/ProgressBar"
 
@@ -27,38 +26,22 @@ export default function BeneficiaryDashboardStep() {
         setIsLoading(true)
         setError(null)
 
-        if (!user?.email) {
+        if (!user?.id) {
           setError("Usuario no identificado")
           setIsLoading(false)
           return
         }
 
-        // Primero obtener el user_id del usuario actual
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("id")
-          .eq("email", user.email)
-          .single()
+        // Llamar al endpoint para obtener beneficiarios usando supabaseServer
+        const response = await fetch(`/api/beneficiaries/list?user_id=${user.id}`)
 
-        if (userError || !userData) {
-          setError("Error al cargar datos del usuario")
-          setIsLoading(false)
-          return
-        }
-
-        // Luego traer los beneficiarios de ese usuario
-        const { data, error: beneficiaryError } = await supabase
-          .from("beneficiaries")
-          .select("*")
-          .eq("user_id", userData.id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-
-        if (beneficiaryError) {
+        if (!response.ok) {
           setError("Error al cargar beneficiarios")
           setIsLoading(false)
           return
         }
+
+        const { beneficiaries: data } = await response.json()
 
         // Mapear los datos de Supabase al formato BeneficiaryData
         const mappedBeneficiaries: BeneficiaryRecord[] = (data || []).map((item: any) => ({
@@ -88,7 +71,7 @@ export default function BeneficiaryDashboardStep() {
     }
 
     loadBeneficiaries()
-  }, [user?.email])
+  }, [user?.id])
 
   const handleBack = () => {
     setCurrentStep(getPreviousStep("beneficiary-dashboard"))
