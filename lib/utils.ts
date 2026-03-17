@@ -66,9 +66,9 @@ export function generateWhatsAppMessage(
     message += `📋 Par: ${quote.sourceCurrency} ↔ ${quote.destinationCurrency}\n\n`
 
     message += `💵 MONTOS\n`
-    message += `💵 Envías: ${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}\n`
-    message += `💵 Recibe: ${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}\n`
-    message += `💵 Tasa: 1 ${quote.sourceCurrency} = ${quote.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${quote.destinationCurrency}\n\n`
+    message += `💵 Envías: ${sourceCurrency?.symbol}${(quote.amount || 0).toLocaleString()} ${quote.sourceCurrency}\n`
+    message += `💵 Recibe: ${destCurrency?.symbol}${(quote.result || 0).toLocaleString()} ${quote.destinationCurrency}\n`
+    message += `💵 Tasa: 1 ${quote.sourceCurrency} = ${(quote.rate || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${quote.destinationCurrency}\n\n`
 
     message += `👤 REMITENTE\n`
     message += `👤 Nombre: ${user.fullName}\n`
@@ -89,9 +89,9 @@ export function generateWhatsAppMessage(
     message += `📋 Par: ${quote.sourceCurrency} ↔ ${quote.destinationCurrency}\n\n`
 
     message += `💵 MONTOS\n`
-    message += `💵 Remitente envía: ${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}\n`
-    message += `💵 Yo recibo: ${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}\n`
-    message += `💵 Tasa: 1 ${quote.sourceCurrency} = ${quote.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${quote.destinationCurrency}\n\n`
+    message += `💵 Remitente envía: ${sourceCurrency?.symbol}${(quote.amount || 0).toLocaleString()} ${quote.sourceCurrency}\n`
+    message += `💵 Yo recibo: ${destCurrency?.symbol}${(quote.result || 0).toLocaleString()} ${quote.destinationCurrency}\n`
+    message += `💵 Tasa: 1 ${quote.sourceCurrency} = ${(quote.rate || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${quote.destinationCurrency}\n\n`
 
     message += `👤 REMITENTE\n`
     message += `👤 Nombre: ${sender?.fullName || "N/A"}\n`
@@ -114,9 +114,9 @@ export function generateWhatsAppMessage(
     message += `📋 Par: ${quote.sourceCurrency} ↔ USDT\n\n`
 
     message += `💵 MONTOS\n`
-    message += `💵 Envías: ${sourceCurrency?.symbol}${quote.amount.toLocaleString()} ${quote.sourceCurrency}\n`
-    message += `💵 Recibes: ${quote.result.toLocaleString()} USDT\n`
-    message += `💵 Tasa: 1 ${quote.sourceCurrency} = ${quote.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT\n\n`
+    message += `💵 Envías: ${sourceCurrency?.symbol}${(quote.amount || 0).toLocaleString()} ${quote.sourceCurrency}\n`
+    message += `💵 Recibes: ${(quote.result || 0).toLocaleString()} USDT\n`
+    message += `💵 Tasa: 1 ${quote.sourceCurrency} = ${(quote.rate || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT\n\n`
 
     message += `👤 MIS DATOS\n`
     message += `👤 Nombre: ${user.fullName}\n`
@@ -136,9 +136,9 @@ export function generateWhatsAppMessage(
     message += `📋 Par: USDT ↔ ${quote.destinationCurrency}\n\n`
 
     message += `💵 MONTOS\n`
-    message += `💵 USDT a vender: ${quote.amount.toLocaleString()} USDT\n`
-    message += `💵 Recibes: ${destCurrency?.symbol}${quote.result.toLocaleString()} ${quote.destinationCurrency}\n`
-    message += `💵 Tasa: 1 USDT = ${quote.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${quote.destinationCurrency}\n\n`
+    message += `💵 USDT a vender: ${(quote.amount || 0).toLocaleString()} USDT\n`
+    message += `💵 Recibes: ${destCurrency?.symbol}${(quote.result || 0).toLocaleString()} ${quote.destinationCurrency}\n`
+    message += `💵 Tasa: 1 USDT = ${(quote.rate || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${quote.destinationCurrency}\n\n`
 
     message += `👤 MIS DATOS\n`
     message += `👤 Nombre: ${user.fullName}\n`
