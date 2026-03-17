@@ -104,9 +104,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (operationMode === "send") {
       const sendFlow: Record<string, string> = {
         "calculator": "email",
-        "email": isUserExisting ? "user-data" : user?.profile_completed ? "user-data" : "welcome",
+        "email": isUserExisting ? "beneficiary-dashboard" : user?.profile_completed ? "user-data" : "welcome",
         "welcome": "user-data",
         "user-data": "beneficiary-data",
+        "beneficiary-dashboard": "summary",
         "beneficiary-data": "summary",
         "summary": "payment",
       }
@@ -164,8 +165,9 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         "email": "calculator",
         "welcome": "email",
         "user-data": user?.profile_completed || isUserExisting ? "email" : "welcome",
-        "beneficiary-data": "user-data",
-        "summary": "beneficiary-data",
+        "beneficiary-dashboard": "email",
+        "beneficiary-data": isUserExisting ? "beneficiary-dashboard" : "user-data",
+        "summary": beneficiary?.id ? "beneficiary-dashboard" : "beneficiary-data",
         "payment": "summary",
       }
       return sendFlowReverse[currentStep] || "calculator"
