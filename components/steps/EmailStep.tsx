@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlow } from "@/contexts/FlowContext"
 import { checkUserExists } from "@/lib/database"
-import { supabase } from "@/lib/supabase"
 import ProgressBar from "@/components/ProgressBar"
 
 export default function EmailStep() {
@@ -61,6 +60,33 @@ export default function EmailStep() {
         }
         console.log('[v0] USER DATA (existing):', JSON.stringify(existingUserData))
         setUser(existingUserData)
+
+        // Verificar si el usuario tiene beneficiarios y perfil completo usando el API
+        try {
+          const checkResponse = await fetch(`/api/users/check?email=${encodeURIComponent(email)}`)
+          if (checkResponse.ok) {
+            const { hasBeneficiaries, profileComplete } = await checkResponse.json()
+            console.log('[v0] hasBeneficiaries:', hasBeneficiaries, 'profileComplete:', profileComplete)
+
+            if (hasBeneficiaries) {
+              // Tiene beneficiarios, ir al dashboard
+              setCurrentStep("beneficiary-dashboard")
+            } else if (profileComplete) {
+              // Perfil completo pero sin beneficiarios, ir a user-data para agregar beneficiario
+              setCurrentStep("user-data")
+            } else {
+              // Perfil incompleto, debe completarlo
+              setCurrentStep("user-data")
+            }
+          } else {
+            // En caso de error, ir a user-data como fallback
+            setCurrentStep("user-data")
+          }
+        } catch (checkError) {
+          console.error('[v0] Error checking user details:', checkError)
+          // Fallback a user-data si hay error
+          setCurrentStep("user-data")
+        }
       } else {
         // Usuario nuevo - guardar solo el email en el contexto sin crear en BD
         // El usuario se creará más adelante en un API route del servidor con permisos
@@ -76,27 +102,7 @@ export default function EmailStep() {
         }
         console.log('[v0] USER DATA (new):', JSON.stringify(newUserData))
         setUser(newUserData)
-      }
-
-      // Si es usuario nuevo, ir a welcome
-      // Si es existente, verificar si tiene beneficiarios guardados
-      if (!existingUser) {
         setCurrentStep("welcome")
-      } else {
-        // Verificar si el usuario existente tiene beneficiarios guardados
-        const { data: beneficiaries } = await supabase
-          .from("beneficiaries")
-          .select("id")
-          .eq("user_id", existingUser.id)
-          .limit(1)
-
-        if (beneficiaries && beneficiaries.length > 0) {
-          // Tiene beneficiarios guardados, ir al dashboard
-          setCurrentStep("beneficiary-dashboard")
-        } else {
-          // No tiene beneficiarios, ir directamente a user-data
-          setCurrentStep("user-data")
-        }
       }
     } catch (error) {
       console.error("Error checking user:", error)
