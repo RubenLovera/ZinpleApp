@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, User, Phone, Mail, Users, Smartphone, Building } from "lucide-react"
+import { ArrowLeft, Smartphone, Building } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -44,7 +44,7 @@ const relationships = [
 ]
 
 export default function BeneficiaryDataStep() {
-  const { quote, beneficiary, setBeneficiary, setCurrentStep, getNextStep, getPreviousStep } = useFlow()
+  const { quote, beneficiary, setBeneficiary, setCurrentStep, getNextStep, getPreviousStep, user } = useFlow()
   const [formData, setFormData] = useState<BeneficiaryData>(
     beneficiary || {
       fullName: "",
@@ -62,6 +62,7 @@ export default function BeneficiaryDataStep() {
   const [cedulaType, setCedulaType] = useState<"V" | "E" | "J">("V")
   const [cedulaNumber, setCedulaNumber] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState("")
 
   // Obtener información de la moneda destino
   const destCurrency = quote ? getCurrencyInfo(quote.destinationCurrency) : null
@@ -80,13 +81,6 @@ export default function BeneficiaryDataStep() {
     setCurrentStep(getPreviousStep("beneficiary-data"))
   }
 
-  const handleInputChange = (field: keyof BeneficiaryData, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
   const handlePagomovilChange = (field: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -98,10 +92,8 @@ export default function BeneficiaryDataStep() {
   }
 
   const handleCedulaChange = (value: string) => {
-    // Solo permitir números
     if (value === "" || /^\d+$/.test(value)) {
       setCedulaNumber(value)
-      // Actualizar la cédula completa en formData
       const fullCedula = value ? `${cedulaType}-${value}` : ""
       handlePagomovilChange("cedula", fullCedula)
     }
@@ -109,35 +101,22 @@ export default function BeneficiaryDataStep() {
 
   const handleCedulaTypeChange = (type: "V" | "E" | "J") => {
     setCedulaType(type)
-    // Actualizar la cédula completa en formData
     const fullCedula = cedulaNumber ? `${type}-${cedulaNumber}` : ""
     handlePagomovilChange("cedula", fullCedula)
   }
 
   const handlePhoneChange = (value: string) => {
-    // Solo permitir números
     if (value === "" || /^\d+$/.test(value)) {
       handlePagomovilChange("phone", value)
     }
   }
 
   const isFormValid = () => {
-    // Para Venezuela, necesitamos datos de Pagomóvil
-    if (quote?.destinationCurrency === "VES") {
-      return (
-        formData.fullName.trim() !== "" &&
-        formData.phone.trim() !== "" &&
-        formData.relationship &&
-        formData.pagomovil?.phone.trim() !== "" &&
-        formData.pagomovil?.bank.trim() !== "" &&
-        formData.pagomovil?.accountHolder.trim() !== "" &&
-        formData.pagomovil?.cedula.trim() !== ""
-      )
-    }
-    // Para otros destinos, solo datos básicos por ahora
     return (
       formData.fullName.trim() !== "" &&
-      formData.phone.trim() !== "" &&
+      formData.pagomovil?.phone.trim() !== "" &&
+      formData.pagomovil?.bank.trim() !== "" &&
+      formData.pagomovil?.cedula.trim() !== "" &&
       formData.relationship
     )
   }
@@ -146,12 +125,45 @@ export default function BeneficiaryDataStep() {
     if (!isFormValid()) return
 
     setIsSaving(true)
-    // Simular guardado
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    
-    setBeneficiary(formData)
-    setCurrentStep(getNextStep("beneficiary-data"))
-    setIsSaving(false)
+    setError("")
+
+    try {
+      // Guardar en contexto
+      setBeneficiary(formData)
+
+      // Guardar en Supabase si el usuario tiene ID
+      if (user?.id) {
+        const response = await fetch("/api/beneficiaries/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            fullName: formData.fullName,
+            pagomovilPhone: formData.pagomovil?.phone,
+            bank: formData.pagomovil?.bank,
+            cedula: formData.pagomovil?.cedula,
+            relationship: formData.relationship,
+          }),
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          console.error("[v0] Error saving beneficiary:", data)
+          setError("Error al guardar el beneficiario. Intenta de nuevo.")
+          setIsSaving(false)
+          return
+        }
+
+        console.log("[v0] Beneficiary saved successfully")
+      }
+
+      setCurrentStep(getNextStep("beneficiary-data"))
+    } catch (err) {
+      console.error("[v0] Error in handleSave:", err)
+      setError("Error al guardar el beneficiario. Intenta de nuevo.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -168,7 +180,7 @@ export default function BeneficiaryDataStep() {
               <div className="text-3xl">{destCurrency?.flag || "🇻🇪"}</div>
               <div>
                 <h1 className="text-3xl font-bold text-primary">
-                  Datos del Beneficiario
+                  Datos del Destinatario
                 </h1>
                 <p className="text-gray-600">
                   Persona que recibirá el dinero en {destCurrency?.country || "Venezuela"}
@@ -177,72 +189,102 @@ export default function BeneficiaryDataStep() {
             </div>
           </div>
 
-          {/* Información del beneficiario */}
+          {/* Datos del Destinatario - Sección única */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Información Personal
+                <Smartphone className="w-5 h-5" />
+                Datos del Destinatario
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Nombre completo */}
+              {/* Nombre completo del destinatario */}
               <div>
-                <Label htmlFor="fullName">Nombre Completo del Beneficiario *</Label>
+                <Label htmlFor="fullName">Nombre Completo del Destinatario *</Label>
                 <Input
                   id="fullName"
                   placeholder="Nombre y apellido"
                   value={formData.fullName}
-                  onChange={(e) => handleInputChange("fullName", e.target.value)}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   className="mt-1"
                 />
               </div>
 
-              {/* Teléfono de contacto */}
+              {/* Número de Pago Móvil */}
               <div>
-                <Label htmlFor="phone">Teléfono de Contacto *</Label>
+                <Label htmlFor="pagomovilPhone">Número de Pago Móvil *</Label>
                 <div className="flex gap-2 mt-1">
-                  <div className="w-20 flex items-center justify-center bg-gray-100 rounded-md border text-sm">
-                    +58
+                  <div className="w-16 flex items-center justify-center bg-gray-100 rounded-md border text-sm">
+                    0
                   </div>
                   <Input
-                    id="phone"
+                    id="pagomovilPhone"
                     type="text"
                     placeholder="4141234567"
-                    value={formData.phone}
-                    onChange={(e) => {
-                      if (e.target.value === "" || /^\d+$/.test(e.target.value)) {
-                        handleInputChange("phone", e.target.value)
-                      }
-                    }}
+                    value={formData.pagomovil?.phone || ""}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    maxLength={10}
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-sm text-gray-500 mt-1">Número asociado al Pago Móvil (sin el 0 inicial)</p>
+              </div>
+
+              {/* Banco */}
+              <div>
+                <Label htmlFor="bank">Banco *</Label>
+                <Select
+                  value={formData.pagomovil?.bank || ""}
+                  onValueChange={(value) => handlePagomovilChange("bank", value)}
+                >
+                  <SelectTrigger className="mt-1 cursor-pointer">
+                    <SelectValue placeholder="Selecciona el banco" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {venezuelaBanks.map((bank) => (
+                      <SelectItem key={bank.value} value={bank.value} className="cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Building className="w-4 h-4" />
+                          {bank.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Cédula de Identidad */}
+              <div>
+                <Label htmlFor="cedula">Cédula de Identidad *</Label>
+                <div className="flex gap-2 mt-1">
+                  <Select value={cedulaType} onValueChange={(v) => handleCedulaTypeChange(v as "V" | "E" | "J")}>
+                    <SelectTrigger className="w-20 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="V" className="cursor-pointer">V</SelectItem>
+                      <SelectItem value="E" className="cursor-pointer">E</SelectItem>
+                      <SelectItem value="J" className="cursor-pointer">J</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="cedula"
+                    type="text"
+                    placeholder="12345678"
+                    value={cedulaNumber}
+                    onChange={(e) => handleCedulaChange(e.target.value)}
                     className="flex-1"
                   />
                 </div>
               </div>
 
-              {/* Email (opcional) */}
-              <div>
-                <Label htmlFor="email">Email (opcional)</Label>
-                <div className="relative mt-1">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@ejemplo.com"
-                    value={formData.email || ""}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Relación */}
+              {/* Relación con el beneficiario */}
               <div>
                 <Label htmlFor="relationship">Relación con el Beneficiario *</Label>
                 <Select
                   value={formData.relationship}
                   onValueChange={(value: "familiar" | "amigo" | "cliente" | "proveedor" | "otro") => 
-                    handleInputChange("relationship", value)
+                    setFormData({ ...formData, relationship: value })
                   }
                 >
                   <SelectTrigger className="mt-1 cursor-pointer">
@@ -251,10 +293,7 @@ export default function BeneficiaryDataStep() {
                   <SelectContent>
                     {relationships.map((rel) => (
                       <SelectItem key={rel.value} value={rel.value} className="cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          {rel.label}
-                        </div>
+                        {rel.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -263,114 +302,22 @@ export default function BeneficiaryDataStep() {
             </CardContent>
           </Card>
 
-          {/* Datos de Pagomóvil (para Venezuela) */}
-          {quote?.destinationCurrency === "VES" && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Smartphone className="w-5 h-5" />
-                  Datos de Pago Móvil
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Número de Pagomóvil */}
-                <div>
-                  <Label htmlFor="pagomovilPhone">Número de Pago Móvil *</Label>
-                  <div className="flex gap-2 mt-1">
-                    <div className="w-16 flex items-center justify-center bg-gray-100 rounded-md border text-sm">
-                      0
-                    </div>
-                    <Input
-                      id="pagomovilPhone"
-                      type="text"
-                      placeholder="4141234567"
-                      value={formData.pagomovil?.phone || ""}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      maxLength={10}
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">Número asociado al Pago Móvil (sin el 0 inicial)</p>
-                </div>
-
-                {/* Banco */}
-                <div>
-                  <Label htmlFor="bank">Banco *</Label>
-                  <Select
-                    value={formData.pagomovil?.bank || ""}
-                    onValueChange={(value) => handlePagomovilChange("bank", value)}
-                  >
-                    <SelectTrigger className="mt-1 cursor-pointer">
-                      <SelectValue placeholder="Selecciona el banco" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {venezuelaBanks.map((bank) => (
-                        <SelectItem key={bank.value} value={bank.value} className="cursor-pointer">
-                          <div className="flex items-center gap-2">
-                            <Building className="w-4 h-4" />
-                            {bank.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Titular de la cuenta */}
-                <div>
-                  <Label htmlFor="accountHolder">Titular de la Cuenta *</Label>
-                  <Input
-                    id="accountHolder"
-                    placeholder="Nombre como aparece en el banco"
-                    value={formData.pagomovil?.accountHolder || ""}
-                    onChange={(e) => handlePagomovilChange("accountHolder", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-
-                {/* Cédula */}
-                <div>
-                  <Label htmlFor="cedula">Cédula de Identidad *</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Select value={cedulaType} onValueChange={(v) => handleCedulaTypeChange(v as "V" | "E" | "J")}>
-                      <SelectTrigger className="w-20 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="V" className="cursor-pointer">V</SelectItem>
-                        <SelectItem value="E" className="cursor-pointer">E</SelectItem>
-                        <SelectItem value="J" className="cursor-pointer">J</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      id="cedula"
-                      type="text"
-                      placeholder="12345678"
-                      value={cedulaNumber}
-                      onChange={(e) => handleCedulaChange(e.target.value)}
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Información adicional */}
+          {/* Mensaje informativo */}
           <Card className="mb-6 border-blue-200 bg-blue-50">
             <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <Users className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-blue-800 font-medium">Verificación de datos</p>
-                  <p className="text-blue-700 text-sm mt-1">
-                    Asegúrate de que los datos del beneficiario sean correctos. 
-                    El dinero se enviará a esta cuenta y no podremos revertir la operación si los datos son incorrectos.
-                  </p>
-                </div>
-              </div>
+              <p className="text-blue-800 font-medium">Verificación de datos</p>
+              <p className="text-blue-700 text-sm mt-1">
+                Asegúrate de que los datos del beneficiario sean correctos. 
+                El dinero se enviará a esta cuenta y no podremos revertir la operación si los datos son incorrectos.
+              </p>
             </CardContent>
           </Card>
+
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+              {error}
+            </div>
+          )}
 
           <Button
             onClick={handleSave}
