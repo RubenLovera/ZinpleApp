@@ -27,24 +27,24 @@ import ProgressBar from "@/components/ProgressBar"
 
 // Datos de países con códigos telefónicos
 const countries = [
-  { code: "+1", name: "Estados Unidos", flag: "🇺🇸" },
-  { code: "+1", name: "Canadá", flag: "🇨🇦" },
-  { code: "+52", name: "México", flag: "🇲🇽" },
-  { code: "+57", name: "Colombia", flag: "🇨🇴" },
-  { code: "+58", name: "Venezuela", flag: "🇻🇪" },
-  { code: "+51", name: "Perú", flag: "🇵🇪" },
-  { code: "+56", name: "Chile", flag: "🇨🇱" },
-  { code: "+54", name: "Argentina", flag: "🇦🇷" },
-  { code: "+55", name: "Brasil", flag: "🇧🇷" },
-  { code: "+593", name: "Ecuador", flag: "🇪🇨" },
-  { code: "+595", name: "Paraguay", flag: "🇵🇾" },
-  { code: "+598", name: "Uruguay", flag: "🇺🇾" },
-  { code: "+591", name: "Bolivia", flag: "🇧🇴" },
-  { code: "+34", name: "España", flag: "🇪🇸" },
-  { code: "+39", name: "Italia", flag: "🇮🇹" },
-  { code: "+33", name: "Francia", flag: "🇫🇷" },
-  { code: "+49", name: "Alemania", flag: "🇩🇪" },
-  { code: "+44", name: "Reino Unido", flag: "🇬🇧" },
+  { code: "+1-US", name: "Estados Unidos", flag: "🇺🇸", displayCode: "+1 (US)" },
+  { code: "+1-CA", name: "Canadá", flag: "🇨🇦", displayCode: "+1 (CA)" },
+  { code: "+52", name: "México", flag: "🇲🇽", displayCode: "+52" },
+  { code: "+57", name: "Colombia", flag: "🇨🇴", displayCode: "+57" },
+  { code: "+58", name: "Venezuela", flag: "🇻🇪", displayCode: "+58" },
+  { code: "+51", name: "Perú", flag: "🇵🇪", displayCode: "+51" },
+  { code: "+56", name: "Chile", flag: "🇨🇱", displayCode: "+56" },
+  { code: "+54", name: "Argentina", flag: "🇦🇷", displayCode: "+54" },
+  { code: "+55", name: "Brasil", flag: "🇧🇷", displayCode: "+55" },
+  { code: "+593", name: "Ecuador", flag: "🇪🇨", displayCode: "+593" },
+  { code: "+595", name: "Paraguay", flag: "🇵🇾", displayCode: "+595" },
+  { code: "+598", name: "Uruguay", flag: "🇺🇾", displayCode: "+598" },
+  { code: "+591", name: "Bolivia", flag: "🇧🇴", displayCode: "+591" },
+  { code: "+34", name: "España", flag: "🇪🇸", displayCode: "+34" },
+  { code: "+39", name: "Italia", flag: "🇮🇹", displayCode: "+39" },
+  { code: "+33", name: "Francia", flag: "🇫🇷", displayCode: "+33" },
+  { code: "+49", name: "Alemania", flag: "🇩🇪", displayCode: "+49" },
+  { code: "+44", name: "Reino Unido", flag: "🇬🇧", displayCode: "+44" },
 ]
 
 // Rangos de volumen mensual
@@ -77,7 +77,7 @@ export default function UserDataStep() {
   const [scrollProgress, setScrollProgress] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const [countryCode, setCountryCode] = useState("+58") // Venezuela por defecto
+  const [countryCode, setCountryCode] = useState("+58-VE") // Venezuela por defecto (con identificador único)
   const [phoneNumber, setPhoneNumber] = useState("")
 
   // Inicializar valores de teléfono si ya existe
@@ -86,7 +86,14 @@ export default function UserDataStep() {
       // Intentar separar código de país del número
       const phoneMatch = formData.phone.match(/^(\+\d{1,4})\s*(.+)$/)
       if (phoneMatch) {
-        setCountryCode(phoneMatch[1])
+        const actualCode = phoneMatch[1]
+        // Buscar el código completo en la lista de países (que puede incluir el identificador)
+        const country = countries.find((c) => c.code.split("-")[0] === actualCode)
+        if (country) {
+          setCountryCode(country.code) // Usa el código con identificador si existe
+        } else {
+          setCountryCode(actualCode)
+        }
         setPhoneNumber(phoneMatch[2].replace(/\D/g, "")) // Solo números
       } else {
         setPhoneNumber(formData.phone.replace(/\D/g, ""))
@@ -123,21 +130,25 @@ export default function UserDataStep() {
     }
   }
 
-  // Validación de entrada para teléfono (solo números)
   const handlePhoneNumberChange = (value: string) => {
     // Solo permitir números
     if (value === "" || /^\d+$/.test(value)) {
       setPhoneNumber(value)
+      // Obtener el país seleccionado para extraer el código real (sin el identificador)
+      const selectedCountry = countries.find((c) => c.code === countryCode)
+      const actualCode = selectedCountry?.code.includes("-") ? selectedCountry.code.split("-")[0] : selectedCountry?.code
       // Actualizar el teléfono completo en formData
-      const fullPhone = value ? `${countryCode} ${value}` : ""
+      const fullPhone = value ? `${actualCode} ${value}` : ""
       handleInputChange("phone", fullPhone)
     }
   }
 
   const handleCountryCodeChange = (code: string) => {
     setCountryCode(code)
+    // Obtener el código real (sin el identificador único)
+    const actualCode = code.includes("-") ? code.split("-")[0] : code
     // Actualizar el teléfono completo en formData
-    const fullPhone = phoneNumber ? `${code} ${phoneNumber}` : ""
+    const fullPhone = phoneNumber ? `${actualCode} ${phoneNumber}` : ""
     handleInputChange("phone", fullPhone)
   }
 
@@ -332,13 +343,13 @@ export default function UserDataStep() {
                       <SelectContent className="max-h-60">
                         {countries.map((country) => (
                           <SelectItem
-                            key={`${country.code}-${country.name}`}
+                            key={country.code}
                             value={country.code}
                             className="cursor-pointer"
                           >
                             <div className="flex items-center gap-2">
                               <span>{country.flag}</span>
-                              <span className="font-mono text-sm">{country.code}</span>
+                              <span className="font-mono text-sm">{country.displayCode}</span>
                               <span className="text-sm">{country.name}</span>
                             </div>
                           </SelectItem>

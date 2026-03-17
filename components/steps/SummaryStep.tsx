@@ -280,30 +280,6 @@ export default function SummaryStep() {
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            {/* Datos del usuario */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Tu Información
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <span className="text-gray-600 text-sm">Nombre:</span>
-                  <p className="font-medium">{user.fullName}</p>
-                </div>
-                <div>
-                  <span className="text-gray-600 text-sm">Email:</span>
-                  <p className="font-medium">{user.email}</p>
-                </div>
-                <div>
-                  <span className="text-gray-600 text-sm">Teléfono:</span>
-                  <p className="font-medium">{user.phone}</p>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Datos del beneficiario (modo send) */}
             {operationMode === "send" && beneficiary && (
               <Card>
@@ -318,23 +294,59 @@ export default function SummaryStep() {
                     <span className="text-gray-600 text-sm">Nombre:</span>
                     <p className="font-medium">{beneficiary.fullName}</p>
                   </div>
-                  <div>
-                    <span className="text-gray-600 text-sm">Teléfono:</span>
-                    <p className="font-medium">{beneficiary.phone}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 text-sm">Relación:</span>
-                    <p className="font-medium capitalize">{beneficiary.relationship}</p>
-                  </div>
                   {beneficiary.pagomovil && (
                     <div className="pt-2 border-t">
-                      <span className="text-gray-600 text-sm">Pago Móvil:</span>
-                      <p className="font-medium">0{beneficiary.pagomovil.phone} - {beneficiary.pagomovil.bank}</p>
+                      <span className="text-gray-600 text-sm">Método de Pago:</span>
+                      <p className="font-medium">Pago Móvil</p>
                     </div>
+                  )}
+                  {beneficiary.pagomovil && (
+                    <>
+                      <div>
+                        <span className="text-gray-600 text-sm">Número:</span>
+                        <p className="font-medium">0{beneficiary.pagomovil.phone}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 text-sm">Banco:</span>
+                        <p className="font-medium">{beneficiary.pagomovil.bank}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 text-sm">Titular:</span>
+                        <p className="font-medium">{beneficiary.pagomovil.accountHolder}</p>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
             )}
+
+            {/* Detalles de la operación */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  Detalles de la Operación
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <span className="text-gray-600 text-sm">Tipo de Cambio:</span>
+                  <p className="font-medium">1 {quote.sourceCurrency} = {quote.exchangeRate} {quote.destinationCurrency}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600 text-sm">Comisión:</span>
+                  <p className="font-medium">{(quote.commissionRate * 100).toFixed(1)}%</p>
+                </div>
+                <div className="pt-2 border-t">
+                  <span className="text-gray-600 text-sm">Monto que envías:</span>
+                  <p className="font-bold text-lg">{sourceCurrency?.symbol}{quote.amount.toLocaleString()} {quote.sourceCurrency}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600 text-sm">Monto que recibe:</span>
+                  <p className="font-bold text-lg text-primary">{destCurrency?.symbol}{quote.result.toLocaleString()} {quote.destinationCurrency}</p>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Datos del remitente (modo receive) */}
             {operationMode === "receive" && sender && (
@@ -357,6 +369,32 @@ export default function SummaryStep() {
                   <div>
                     <span className="text-gray-600 text-sm">Relación:</span>
                     <p className="font-medium capitalize">{sender.relationship}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Detalles de la operación (receive) */}
+            {operationMode === "receive" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5" />
+                    Detalles de la Operación
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <span className="text-gray-600 text-sm">Tipo de Cambio:</span>
+                    <p className="font-medium">1 {quote.sourceCurrency} = {quote.exchangeRate} {quote.destinationCurrency}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 text-sm">Comisión:</span>
+                    <p className="font-medium">{(quote.commissionRate * 100).toFixed(1)}%</p>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <span className="text-gray-600 text-sm">Monto que recibes:</span>
+                    <p className="font-bold text-lg text-primary">{destCurrency?.symbol}{quote.result.toLocaleString()} {quote.destinationCurrency}</p>
                   </div>
                 </CardContent>
               </Card>
