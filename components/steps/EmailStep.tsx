@@ -61,30 +61,19 @@ export default function EmailStep() {
         console.log('[v0] USER DATA (existing):', JSON.stringify(existingUserData))
         setUser(existingUserData)
 
-        // Verificar si el usuario tiene beneficiarios y perfil completo usando el API
-        try {
-          const checkResponse = await fetch(`/api/users/check?email=${encodeURIComponent(email)}`)
-          if (checkResponse.ok) {
-            const { hasBeneficiaries, profileComplete } = await checkResponse.json()
-            console.log('[v0] hasBeneficiaries:', hasBeneficiaries, 'profileComplete:', profileComplete)
+        // Determinar a dónde navegar
+        // Traer hasBeneficiaries y profileComplete del endpoint
+        const response = await fetch(`/api/users/check?email=${encodeURIComponent(email)}`)
+        const { hasBeneficiaries, profileComplete } = await response.json()
 
-            if (hasBeneficiaries) {
-              // Tiene beneficiarios, ir al dashboard
-              setCurrentStep("beneficiary-dashboard")
-            } else if (profileComplete) {
-              // Perfil completo pero sin beneficiarios, ir a user-data para agregar beneficiario
-              setCurrentStep("user-data")
-            } else {
-              // Perfil incompleto, debe completarlo
-              setCurrentStep("user-data")
-            }
-          } else {
-            // En caso de error, ir a user-data como fallback
-            setCurrentStep("user-data")
-          }
-        } catch (checkError) {
-          console.error('[v0] Error checking user details:', checkError)
-          // Fallback a user-data si hay error
+        if (hasBeneficiaries) {
+          // Tiene beneficiarios guardados, ir al dashboard
+          setCurrentStep("beneficiary-dashboard")
+        } else if (profileComplete) {
+          // Perfil completo pero sin beneficiarios, ir directo a beneficiary-data para agregar uno
+          setCurrentStep("beneficiary-data")
+        } else {
+          // Perfil incompleto, ir a user-data para completarlo
           setCurrentStep("user-data")
         }
       } else {
